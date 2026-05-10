@@ -319,8 +319,8 @@ function update(dt) {
     th.y = g.py + Math.sin(th.angle) * th.orbitR;
   }
 
-  // Reset per-frame attack flags
-  for (const th of g.thralls) th.underAttack = false;
+  // Reset per-frame combat flags
+  for (const th of g.thralls) { th.underAttack = false; th.inCombat = false; }
 
   // Creatures chase player; outer-ring thralls intercept ones that get very close
   for (const cr of g.creatures) {
@@ -352,11 +352,18 @@ function update(dt) {
       if (targetThrall) {
         targetThrall.hp -= cr.damage * dt;
         targetThrall.underAttack = true;
+        targetThrall.inCombat = true;
         if (g.frame % 3 === 0) spawnParticles(targetThrall.x, targetThrall.y, '#ef4444', 2);
       } else {
         g.hp -= cr.damage * dt;
         if (g.frame % 5 === 0) spawnParticles(g.px, g.py, '#7c3aed', 2);
       }
+    }
+
+    // Proximity-based combat flag — any nearby creature counts as "in combat"
+    for (const th of g.thralls) {
+      if (th.inCombat) continue;
+      if (Math.hypot(cr.x - th.x, cr.y - th.y) < th.r + 110) th.inCombat = true;
     }
   }
 
@@ -404,11 +411,16 @@ function update(dt) {
 }
 
 function recalcThrallOrbits() {
-  const totalRings = Math.max(1, Math.ceil(g.thralls.length / 6));
-  const scale = 1 + (totalRings - 1) * 0.45;
+  // Fixed per-ring radius — no global scale jumps when a new ring forms.
+  // Alternating ring direction keeps the formation visually distinct.
+  const perRing = 6;
+  const ringGap = Math.min(W, H) * 0.075;
   for (let i = 0; i < g.thralls.length; i++) {
-    const ring = Math.floor(i / 6);
-    g.thralls[i].orbitR = (g.thrallOrbitBase + ring * Math.min(W, H) * 0.075) * scale;
+    const th = g.thralls[i];
+    const ring = Math.floor(i / perRing);
+    th.ring    = ring;
+    th.orbitR  = g.thrallOrbitBase + ring * ringGap;
+    th.orbitSpeed = (ring % 2 === 0 ? 1 : -1) * (0.7 - ring * 0.08);
   }
 }
 
@@ -659,12 +671,13 @@ function drawHUD() {
     ctx.shadowBlur = 0;
   }
 
-  // Offscreen battle arrows — flash when a thrall is under attack outside viewport
+  // Offscreen battle arrows — flash toward any offscreen thrall engaged in combat.
+  // Brighter red when actively taking damage, softer amber when just near enemies.
   const camX = W / 2 - g.px, camY = H / 2 - g.py;
   const arrowMargin = 36;
   const flashOn = Math.sin(g.frame * 0.25) > 0;
   for (const th of g.thralls) {
-    if (!th.underAttack) continue;
+    if (!th.inCombat) continue;
     const sx = th.x + camX, sy = th.y + camY;
     if (sx >= arrowMargin && sx <= W - arrowMargin && sy >= arrowMargin && sy <= H - arrowMargin) continue;
     const dx = sx - CX, dy = sy - CY;
@@ -674,12 +687,14 @@ function drawHUD() {
     const t = ac < 0.001 ? hh / as : as < 0.001 ? hw / ac : Math.min(hw / ac, hh / as);
     const edgeX = CX + Math.cos(angle) * t;
     const edgeY = CY + Math.sin(angle) * t;
+    const urgent = th.underAttack;
+    const color  = urgent ? '#ef4444' : '#f59e0b';
     ctx.save();
     ctx.translate(edgeX, edgeY);
     ctx.rotate(angle);
-    ctx.globalAlpha = flashOn ? 1 : 0.35;
-    ctx.fillStyle = '#ef4444';
-    ctx.shadowColor = '#ef4444'; ctx.shadowBlur = flashOn ? 14 : 0;
+    ctx.globalAlpha = urgent ? (flashOn ? 1 : 0.4) : 0.7;
+    ctx.fillStyle = color;
+    ctx.shadowColor = color; ctx.shadowBlur = urgent && flashOn ? 14 : 6;
     ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(-7, 8); ctx.lineTo(-7, -8); ctx.closePath(); ctx.fill();
     ctx.restore();
   }
