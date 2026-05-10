@@ -334,8 +334,8 @@ function update(dt) {
         if (d < nearestD) { nearestD = d; targetThrall = th; }
       }
       const playerDist = Math.hypot(cr.x - g.px, cr.y - g.py);
-      // Only redirect if thrall is significantly closer (true interception)
-      if (nearestD < playerDist * 0.55) {
+      // Only redirect if thrall is far closer (rare true interception)
+      if (nearestD < playerDist * 0.4) {
         tx = targetThrall.x; ty = targetThrall.y;
       } else {
         targetThrall = null;
