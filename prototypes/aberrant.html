@@ -161,6 +161,10 @@ canvas.height = window.innerHeight;
 const W = canvas.width, H = canvas.height;
 const CX = W/2, CY = H/2;
 
+// Arena — all gameplay stays inside this rectangle
+const AP = 70; // padding from screen edges
+const ARENA = { x: AP, y: AP, w: W - AP*2, h: H - AP*2 };
+
 const keys = {};
 document.addEventListener('keydown', e => { keys[e.key] = true; if (!['F5','F12'].includes(e.key)) e.preventDefault(); });
 document.addEventListener('keyup',   e => { keys[e.key] = false; });
@@ -200,7 +204,7 @@ function beginGame() {
 
 function resetGame() {
   g = {
-    px: CX, py: CY,
+    px: ARENA.x + ARENA.w/2, py: ARENA.y + ARENA.h/2,
     playerSpeed: 220,
     hp: 100, maxHp: 100,
     essence: 0, passiveDrain: 0,
@@ -247,13 +251,14 @@ function spawnWave(wave) {
 }
 
 function spawnCreature(wave) {
-  // Spawn from random screen edge
+  // Spawn just outside the arena edges — always visible on screen
   const edge = Math.floor(Math.random() * 4);
   let sx, sy;
-  if      (edge === 0) { sx = Math.random() * W; sy = -45; }
-  else if (edge === 1) { sx = W + 45; sy = Math.random() * H; }
-  else if (edge === 2) { sx = Math.random() * W; sy = H + 45; }
-  else                 { sx = -45; sy = Math.random() * H; }
+  const m = 30;
+  if      (edge === 0) { sx = ARENA.x + Math.random() * ARENA.w; sy = ARENA.y - m; }
+  else if (edge === 1) { sx = ARENA.x + ARENA.w + m; sy = ARENA.y + Math.random() * ARENA.h; }
+  else if (edge === 2) { sx = ARENA.x + Math.random() * ARENA.w; sy = ARENA.y + ARENA.h + m; }
+  else                 { sx = ARENA.x - m; sy = ARENA.y + Math.random() * ARENA.h; }
 
   // Filter by minWave, then weight by rarity
   const avail = Object.entries(CREATURES).filter(([, d]) => d.minWave <= wave);
@@ -280,8 +285,8 @@ function updateMovement(dt) {
   if (keys['ArrowUp']    || keys['w'] || keys['W']) dy -= 1;
   if (keys['ArrowDown']  || keys['s'] || keys['S']) dy += 1;
   if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
-  g.px = Math.max(18, Math.min(W - 18, g.px + dx * g.playerSpeed * dt));
-  g.py = Math.max(18, Math.min(H - 18, g.py + dy * g.playerSpeed * dt));
+  g.px = Math.max(ARENA.x + 18, Math.min(ARENA.x + ARENA.w - 18, g.px + dx * g.playerSpeed * dt));
+  g.py = Math.max(ARENA.y + 18, Math.min(ARENA.y + ARENA.h - 18, g.py + dy * g.playerSpeed * dt));
 
   if (dx !== 0 || dy !== 0) {
     g.trail.push({ x: g.px, y: g.py, alpha: 0.5 });
@@ -318,20 +323,19 @@ function update(dt) {
     th.y = g.py + Math.sin(th.angle) * th.orbitR;
   }
 
-  // Creatures target nearest entity — thralls act as a natural shield ring
+  // Creatures chase player; outer-ring thralls intercept ones that get very close
   for (const cr of g.creatures) {
     let tx = g.px, ty = g.py, targetThrall = null;
 
     if (g.thralls.length > 0) {
-      // Find nearest thrall
       let nearestD = Infinity;
       for (const th of g.thralls) {
         const d = Math.hypot(cr.x - th.x, cr.y - th.y);
         if (d < nearestD) { nearestD = d; targetThrall = th; }
       }
       const playerDist = Math.hypot(cr.x - g.px, cr.y - g.py);
-      // Chase thrall only if it's closer than the player
-      if (nearestD < playerDist) {
+      // Only redirect if thrall is significantly closer (true interception)
+      if (nearestD < playerDist * 0.55) {
         tx = targetThrall.x; ty = targetThrall.y;
       } else {
         targetThrall = null;
@@ -418,8 +422,8 @@ function dominateCreature(cr) {
     type: cr.type, r: cr.r * 0.85, emoji: cr.emoji,
     wave: g.wave,
     id: Math.random(),
-    hp: Math.round(CREATURES[cr.type].baseHp * 1.5 * Math.pow(1.2, g.wave - 1)),
-    maxHp: Math.round(CREATURES[cr.type].baseHp * 1.5 * Math.pow(1.2, g.wave - 1)),
+    hp: Math.round(CREATURES[cr.type].baseHp * 3.0 * Math.pow(1.2, g.wave - 1)),
+    maxHp: Math.round(CREATURES[cr.type].baseHp * 3.0 * Math.pow(1.2, g.wave - 1)),
   });
   updateThrallPanel();
 }
@@ -463,10 +467,18 @@ function render() {
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = '#0a0a14'; ctx.fillRect(0, 0, W, H);
 
-  // Grid
+  // Grid (only inside arena)
   ctx.strokeStyle = '#0e0e20'; ctx.lineWidth = 1;
+  ctx.save(); ctx.beginPath(); ctx.rect(ARENA.x, ARENA.y, ARENA.w, ARENA.h); ctx.clip();
   for (let x = 0; x < W; x += 44) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
   for (let y = 0; y < H; y += 44) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  ctx.restore();
+
+  // Arena border
+  ctx.shadowColor = '#4c1d95'; ctx.shadowBlur = 18;
+  ctx.strokeStyle = '#2d1b69'; ctx.lineWidth = 2;
+  ctx.strokeRect(ARENA.x, ARENA.y, ARENA.w, ARENA.h);
+  ctx.shadowBlur = 0;
 
   // Player trail
   for (const t of g.trail) {
@@ -481,12 +493,8 @@ function render() {
   ctx.beginPath(); ctx.arc(g.px, g.py, g.boltRange, 0, Math.PI * 2); ctx.stroke();
   ctx.setLineDash([]);
 
-  // Thrall orbit rings + bodies
+  // Thralls
   for (const th of g.thralls) {
-    ctx.strokeStyle = th.color + '15'; ctx.lineWidth = 1; ctx.setLineDash([3, 5]);
-    ctx.beginPath(); ctx.arc(g.px, g.py, th.orbitR, 0, Math.PI * 2); ctx.stroke();
-    ctx.setLineDash([]);
-
     ctx.shadowColor = th.color; ctx.shadowBlur = 8;
     ctx.beginPath(); ctx.arc(th.x, th.y, th.r, 0, Math.PI * 2);
     ctx.fillStyle = th.color + '55'; ctx.fill();
