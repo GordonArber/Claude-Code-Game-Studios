@@ -311,7 +311,7 @@ function update(dt) {
   // Advance per-ring rotation phase (alternating direction, slower for outer rings)
   for (let r = 0; r < g.ringPhase.length; r++) {
     const dir = (r % 2 === 0 ? 1 : -1);
-    const speed = Math.max(0.08, 0.25 - r * 0.05);
+    const speed = Math.max(0.05, 0.15 - r * 0.03);
     g.ringPhase[r] += dir * speed * dt;
   }
 
@@ -430,8 +430,8 @@ function recalcThrallOrbits() {
   // When inner ring fills, the next add lands in inner slot 0 and the
   // previously-inner cohort shifts out to the next ring. Targets only —
   // actual orbitR/slotOffsetCurrent lerp toward these in the update loop.
-  const perRing = 10;
-  const ringGap = Math.min(W, H) * 0.075;
+  const perRing = 12;
+  const ringGap = Math.min(W, H) * 0.06;
   const total = g.thralls.length;
   const numRings = Math.max(1, Math.ceil(total / perRing));
   while (g.ringPhase.length < numRings) g.ringPhase.push(0);
