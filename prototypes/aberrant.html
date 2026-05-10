@@ -456,7 +456,7 @@ function recalcThrallOrbits() {
   }
 }
 
-const THRALL_CAP = 20;
+const THRALL_CAP = 60;
 
 function dominateCreature(cr) {
   g.totalDominated++;
@@ -487,8 +487,8 @@ function dominateCreature(cr) {
     type: cr.type, r: cr.r * 0.85, emoji: cr.emoji,
     wave: g.wave,
     id: Math.random(),
-    hp: Math.round(CREATURES[cr.type].baseHp * 3.0 * Math.pow(1.2, g.wave - 1)),
-    maxHp: Math.round(CREATURES[cr.type].baseHp * 3.0 * Math.pow(1.2, g.wave - 1)),
+    hp: Math.round(CREATURES[cr.type].baseHp * 1.2 * Math.pow(1.12, g.wave - 1)),
+    maxHp: Math.round(CREATURES[cr.type].baseHp * 1.2 * Math.pow(1.12, g.wave - 1)),
   });
   recalcThrallOrbits();
   // Seed the new thrall's slotOffsetCurrent so visual angle equals startAngle;
