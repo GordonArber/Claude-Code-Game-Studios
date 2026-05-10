@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ABERRANT</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #000; overflow: hidden; font-family: Arial, sans-serif; }
+canvas { display: block; }
+
+#startScreen {
+  position: fixed; inset: 0;
+  background: #08080f;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 22px; z-index: 300;
+}
+.s-title { font-size: 52px; font-weight: bold; color: #a855f7; letter-spacing: 14px; text-transform: uppercase; text-shadow: 0 0 50px #a855f7aa; }
+.s-sub { font-size: 11px; color: #374151; letter-spacing: 5px; }
+.s-lore { font-size: 13px; color: #6b7280; max-width: 440px; text-align: center; line-height: 1.8; }
+.s-section-label { font-size: 9px; letter-spacing: 3px; color: #1f2937; text-transform: uppercase; text-align: center; }
+.s-controls { display: grid; grid-template-columns: auto auto; gap: 6px 24px; }
+.s-key { color: #a855f7; font-size: 12px; font-weight: bold; }
+.s-desc { color: #4b5563; font-size: 12px; }
+.s-creatures { display: flex; gap: 12px; }
+.s-creature {
+  background: #0f0f1e; border: 1px solid #1f2937; border-radius: 10px;
+  padding: 12px 16px; text-align: center; min-width: 110px;
+}
+.s-creature .ce { font-size: 26px; }
+.s-creature .cn { font-size: 10px; color: #9ca3af; margin-top: 5px; }
+.s-creature .cd { font-size: 9px; color: #374151; margin-top: 2px; line-height: 1.4; }
+.begin-btn {
+  background: #7c3aed; border: none; border-radius: 10px;
+  padding: 14px 44px; color: #fff; font-size: 15px;
+  letter-spacing: 5px; cursor: pointer; margin-top: 6px;
+  box-shadow: 0 0 24px #7c3aed77; transition: background 0.15s, box-shadow 0.15s;
+}
+.begin-btn:hover { background: #a855f7; box-shadow: 0 0 36px #a855f7aa; }
+
+#upgradeOverlay {
+  position: fixed; inset: 0;
+  background: rgba(8,8,15,0.93);
+  display: none; align-items: center; justify-content: center;
+  flex-direction: column; gap: 22px; z-index: 200;
+}
+#upgradeOverlay h2 { font-size: 10px; letter-spacing: 5px; color: #374151; text-transform: uppercase; }
+.upgrade-cards { display: flex; gap: 16px; }
+.upgrade-card {
+  width: 175px; background: #0f0f1e; border: 2px solid #2d1b69;
+  border-radius: 12px; padding: 22px; cursor: pointer;
+  text-align: center; color: #e5e7eb; transition: all 0.15s;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.7);
+}
+.upgrade-card:hover { border-color: #a855f7; box-shadow: 0 6px 24px rgba(168,85,247,0.4); transform: translateY(-3px); }
+.upgrade-card .u-icon { font-size: 38px; margin-bottom: 10px; }
+.upgrade-card .u-name { font-size: 13px; font-weight: bold; color: #e5e7eb; margin-bottom: 6px; }
+.upgrade-card .u-desc { font-size: 11px; color: #4b5563; line-height: 1.5; }
+
+#gameoverOverlay {
+  position: fixed; inset: 0;
+  background: rgba(8,8,15,0.97);
+  display: none; align-items: center; justify-content: center;
+  flex-direction: column; gap: 14px; z-index: 300;
+}
+#gameoverOverlay h2 { font-size: 30px; color: #e5e7eb; }
+.go-result { font-size: 14px; color: #4b5563; }
+.go-essence { font-size: 34px; color: #22d3ee; font-weight: bold; }
+.restart-btn {
+  background: #7c3aed; border: none; border-radius: 10px;
+  padding: 12px 30px; color: #fff; font-size: 14px;
+  letter-spacing: 3px; cursor: pointer; margin-top: 8px;
+  transition: background 0.15s;
+}
+.restart-btn:hover { background: #a855f7; }
+
+#thrallPanel {
+  position: fixed; top: 60px; right: 0;
+  width: 158px;
+  max-height: calc(100vh - 120px);
+  background: rgba(8,8,15,0.82);
+  border-left: 1px solid #1f2937;
+  display: none; flex-direction: column;
+  overflow: hidden; z-index: 50;
+}
+#thrallPanel .tp-header {
+  font-size: 8px; letter-spacing: 3px; color: #2d3748;
+  text-transform: uppercase; padding: 10px 12px 6px;
+  border-bottom: 1px solid #111827;
+}
+#thrallPanel .tp-empty { font-size: 10px; color: #1f2937; padding: 10px 12px; }
+#thrallPanel .tp-list { overflow-y: auto; flex: 1; }
+.tp-node {
+  display: flex; align-items: center; gap: 7px;
+  padding: 5px 12px; border-bottom: 1px solid #0f0f1e;
+  font-size: 10px; color: #4b5563;
+}
+.tp-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.tp-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tp-wave { font-size: 9px; color: #1f2937; flex-shrink: 0; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<!-- ── START SCREEN ──────────────────────────────────────────────────────── -->
+<div id="startScreen">
+  <div class="s-title">Aberrant</div>
+  <div class="s-sub">psionic · dominator · survivors</div>
+
+  <div class="s-lore">
+    An aberrant mind awakens in the ruins of a fallen dungeon-world.<br>
+    Dominate the swarming creatures — bend them to your will.<br>
+    Survive 10 waves. Build your horde.
+  </div>
+
+  <div class="s-section-label">Controls</div>
+  <div class="s-controls">
+    <span class="s-key">WASD / Arrows</span><span class="s-desc">Move</span>
+    <span class="s-key">Auto</span><span class="s-desc">Fire psionic bolts at nearest creature</span>
+    <span class="s-key">Goal</span><span class="s-desc">Dominate all 10 waves — thralls fight for you</span>
+  </div>
+
+  <div class="s-section-label">Creatures</div>
+  <div class="s-creatures">
+    <div class="s-creature"><div class="ce">😤</div><div class="cn">Feral Gnoll</div><div class="cd">Fast · Weak<br>Wave 1+</div></div>
+    <div class="s-creature"><div class="ce">👁️</div><div class="cn">Irradiated Beholder</div><div class="cd">Slow · Tough<br>Wave 3+</div></div>
+    <div class="s-creature"><div class="ce">🧌</div><div class="cn">Mutant Troll</div><div class="cd">Lumbering · Tanky<br>Wave 6+</div></div>
+  </div>
+
+  <button class="begin-btn" onclick="beginGame()">BEGIN DOMINATION</button>
+</div>
+
+<!-- ── THRALL PANEL ───────────────────────────────────────────────────────── -->
+<div id="thrallPanel">
+  <div class="tp-header" id="tpHeader">Your Thralls</div>
+  <div class="tp-empty" id="tpEmpty">No thralls yet</div>
+  <div class="tp-list" id="tpList"></div>
+</div>
+
+<!-- ── UPGRADE OVERLAY ───────────────────────────────────────────────────── -->
+<div id="upgradeOverlay">
+  <h2>🧠 Psionic Evolution — Choose an Ability</h2>
+  <div class="upgrade-cards" id="upgradeCards"></div>
+</div>
+
+<!-- ── GAME OVER ─────────────────────────────────────────────────────────── -->
+<div id="gameoverOverlay">
+  <div style="font-size:52px">🧠</div>
+  <h2 id="goTitle">Mind Shattered</h2>
+  <div class="go-result" id="goResult">Your psionic hold collapsed.</div>
+  <div class="go-essence" id="goEssence">0 essence</div>
+  <button class="restart-btn" onclick="restartGame()">DOMINATE AGAIN</button>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+canvas.width  = window.innerWidth;
+canvas.height = window.innerHeight;
+const W = canvas.width, H = canvas.height;
+const CX = W/2, CY = H/2;
+
+// Vampire Survivors style: camera follows the player. World is unbounded.
+// camX/camY are the translation offsets so the player sits at screen center.
+
+const keys = {};
+document.addEventListener('keydown', e => { keys[e.key] = true; if (!['F5','F12'].includes(e.key)) e.preventDefault(); });
+document.addEventListener('keyup',   e => { keys[e.key] = false; });
+
+// ── UPGRADES ──────────────────────────────────────────────────────────────────
+const UPGRADES = [
+  { id:'surge',   icon:'⚡', name:'Synaptic Surge',    desc:'Bolt rate +35%',                        apply: g => { g.boltRate *= 1.35; } },
+  { id:'neuro',   icon:'🛡️', name:'Neural Fortitude',  desc:'+40 max sanity, restore to 75%',        apply: g => { g.maxHp += 40; g.hp = Math.max(g.hp, g.maxHp * 0.75); } },
+  { id:'shatter', icon:'💜', name:'Mind Shatter',       desc:'Psionic damage ×1.5',                   apply: g => { g.boltDmg = Math.round(g.boltDmg * 1.5); } },
+  { id:'hive',    icon:'🌀', name:'Hive Resonance',     desc:'Thralls attack 2× faster',              apply: g => { g.thrallAttackSpeed *= 2; } },
+  { id:'reach',   icon:'👁️', name:'Psionic Reach',      desc:'Domination range +30%',                 apply: g => { g.boltRange *= 1.3; } },
+  { id:'frenzy',  icon:'🔗', name:'Thrall Frenzy',      desc:'Thrall fire rate +60%',                 apply: g => { g.thrallFireRate *= 1.6; } },
+  { id:'carap',   icon:'🌑', name:'Eldritch Carapace',  desc:'+60 max sanity, restore to 80%',        apply: g => { g.maxHp += 60; g.hp = Math.max(g.hp, g.maxHp * 0.80); } },
+  { id:'lance',   icon:'🌊', name:'Void Lance',         desc:'Bolt speed +45%',                       apply: g => { g.boltSpeed *= 1.45; } },
+  { id:'drain',   icon:'🧿', name:'Aberrant Drain',     desc:'Siphon 8 essence/sec passively',        apply: g => { g.passiveDrain += 8; } },
+  { id:'split',   icon:'🧠', name:'Split Consciousness',  unique: true,                          desc:'Fire at 2 targets simultaneously',           apply: g => { g.multibolt = 2; } },
+  { id:'pierce',  icon:'🔮', name:'Psionic Pierce',       unique: true, requires: 'split',      desc:'Upgrade: bolts pierce through all enemies',  apply: g => { g.boltPierce = true; } },
+];
+
+// ── CREATURE DEFINITIONS ──────────────────────────────────────────────────────
+const CREATURES = {
+  gnoll:   { r:11, baseHp:32,  baseSpd:145, baseDmg:14, essence:80,  emoji:'😤', color:[220,50,50],   minWave:1 },
+  beholder:{ r:15, baseHp:75,  baseSpd:90,  baseDmg:20, essence:220, emoji:'👁️', color:[139,92,246], minWave:3 },
+  troll:   { r:18, baseHp:130, baseSpd:68,  baseDmg:30, essence:380, emoji:'🧌', color:[34,197,94],  minWave:6 },
+};
+const THRALL_COLORS = ['#e879f9','#38bdf8','#4ade80','#fb923c','#f472b6','#a3e635','#67e8f9'];
+
+let g = {};
+const CREATURE_LABELS = { gnoll: 'Feral Gnoll', beholder: 'Irrad. Beholder', troll: 'Mutant Troll' };
+
+function beginGame() {
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('thrallPanel').style.display = 'flex';
+  resetGame();
+  requestAnimationFrame(ts => { g.lastTime = ts; requestAnimationFrame(loop); });
+}
+
+function resetGame() {
+  g = {
+    px: 0, py: 0,
+    playerSpeed: 220,
+    hp: 100, maxHp: 100,
+    essence: 0, passiveDrain: 0,
+    boltRate: 1.6,
+    boltDmg: 22,
+    boltSpeed: 300,
+    boltRange: Math.min(W, H) * 0.4,
+    boltPierce: false,
+    multibolt: 1,
+    boltCooldown: 0,
+    thrallFireRate: 0.50,
+    thrallAttackSpeed: 1,
+    acquiredUpgrades: new Set(),
+    wave: 1,
+    waveState: 'active',
+    creaturesLeft: 0,
+    totalDominated: 0,
+    thralls: [],
+    creatures: [],
+    bolts: [],
+    particles: [],
+    floaters: [],
+    trail: [],
+    thrallOrbitBase: Math.min(W, H) * 0.1,
+    frame: 0,
+    lastTime: 0,
+  };
+  spawnWave(1);
+}
+
+// ── WAVE SPAWNING ──────────────────────────────────────────────────────────────
+function spawnWave(wave) {
+  // Wave 1 = 6 slow gnolls only. Scales steeply.
+  const count = 8 + Math.floor(wave * 5);
+  g.creaturesLeft = count;
+
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => {
+      if (g.waveState !== 'active') return;
+      spawnCreature(wave);
+      g.creaturesLeft--;
+    }, i * Math.max(35, 550 - wave * 55));
+  }
+}
+
+function spawnCreature(wave) {
+  // Spawn at a random angle around the player, just outside the camera view
+  const angle = Math.random() * Math.PI * 2;
+  const dist = Math.max(W, H) * 0.6;
+  const sx = g.px + Math.cos(angle) * dist;
+  const sy = g.py + Math.sin(angle) * dist;
+
+  // Filter by minWave, then weight by rarity
+  const avail = Object.entries(CREATURES).filter(([, d]) => d.minWave <= wave);
+  const weights = avail.map(([t]) => t === 'gnoll' ? 6 : t === 'beholder' ? 3 : 1);
+  const total = weights.reduce((a, b) => a + b, 0);
+  let roll = Math.random() * total;
+  let type = avail[0][0];
+  for (let i = 0; i < avail.length; i++) { roll -= weights[i]; if (roll <= 0) { type = avail[i][0]; break; } }
+
+  const def = CREATURES[type];
+  const speedBoost = 1 + (wave - 1) * 0.28;
+  const hp  = Math.round(def.baseHp * Math.pow(1.22, wave - 1)); // exponential HP
+  const dmg = def.baseDmg + (wave - 1) * 5;
+  const ess = def.essence + wave * 25;
+
+  g.creatures.push({ x: sx, y: sy, hp, maxHp: hp, speed: def.baseSpd * speedBoost, damage: dmg, essence: ess, type, r: def.r, emoji: def.emoji, id: Math.random() });
+}
+
+// ── MOVEMENT ──────────────────────────────────────────────────────────────────
+function updateMovement(dt) {
+  let dx = 0, dy = 0;
+  if (keys['ArrowLeft']  || keys['a'] || keys['A']) dx -= 1;
+  if (keys['ArrowRight'] || keys['d'] || keys['D']) dx += 1;
+  if (keys['ArrowUp']    || keys['w'] || keys['W']) dy -= 1;
+  if (keys['ArrowDown']  || keys['s'] || keys['S']) dy += 1;
+  if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
+  g.px += dx * g.playerSpeed * dt;
+  g.py += dy * g.playerSpeed * dt;
+
+  if (dx !== 0 || dy !== 0) {
+    g.trail.push({ x: g.px, y: g.py, alpha: 0.5 });
+    if (g.trail.length > 14) g.trail.shift();
+  }
+  for (const t of g.trail) t.alpha -= 0.04;
+  g.trail = g.trail.filter(t => t.alpha > 0);
+}
+
+// ── UPDATE ────────────────────────────────────────────────────────────────────
+function update(dt) {
+  g.frame++;
+  updateMovement(dt);
+  if (g.waveState !== 'active') return;
+
+  g.essence += g.passiveDrain * dt;
+
+  // Auto-fire
+  g.boltCooldown -= dt;
+  if (g.boltCooldown <= 0 && g.creatures.length > 0) {
+    g.boltCooldown = 1 / g.boltRate;
+    firePlayerBolts();
+  }
+
+  // Thralls orbit + fire
+  for (const th of g.thralls) {
+    th.fireCooldown -= dt;
+    if (th.fireCooldown <= 0 && g.creatures.length > 0) {
+      th.fireCooldown = 1 / (g.thrallFireRate * g.thrallAttackSpeed);
+      fireThrallBolt(th);
+    }
+    th.angle += dt * th.orbitSpeed;
+    th.x = g.px + Math.cos(th.angle) * th.orbitR;
+    th.y = g.py + Math.sin(th.angle) * th.orbitR;
+  }
+
+  // Reset per-frame attack flags
+  for (const th of g.thralls) th.underAttack = false;
+
+  // Creatures chase player; outer-ring thralls intercept ones that get very close
+  for (const cr of g.creatures) {
+    let tx = g.px, ty = g.py, targetThrall = null;
+
+    if (g.thralls.length > 0) {
+      let nearestD = Infinity;
+      for (const th of g.thralls) {
+        const d = Math.hypot(cr.x - th.x, cr.y - th.y);
+        if (d < nearestD) { nearestD = d; targetThrall = th; }
+      }
+      const playerDist = Math.hypot(cr.x - g.px, cr.y - g.py);
+      // Only redirect if thrall is far closer (rare true interception)
+      if (nearestD < playerDist * 0.4) {
+        tx = targetThrall.x; ty = targetThrall.y;
+      } else {
+        targetThrall = null;
+      }
+    }
+
+    const dx = tx - cr.x, dy = ty - cr.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 1) continue;
+    cr.x += (dx / dist) * cr.speed * dt;
+    cr.y += (dy / dist) * cr.speed * dt;
+
+    // Contact damage to target
+    if (dist < (targetThrall ? 16 : 22) + cr.r) {
+      if (targetThrall) {
+        targetThrall.hp -= cr.damage * dt;
+        targetThrall.underAttack = true;
+        if (g.frame % 3 === 0) spawnParticles(targetThrall.x, targetThrall.y, '#ef4444', 2);
+      } else {
+        g.hp -= cr.damage * dt;
+        if (g.frame % 5 === 0) spawnParticles(g.px, g.py, '#7c3aed', 2);
+      }
+    }
+  }
+
+  // Bolts move + hit detection
+  for (const b of g.bolts) {
+    b.x += b.vx * dt; b.y += b.vy * dt; b.age += dt;
+    for (const cr of g.creatures) {
+      if (b.hitIds && b.hitIds.has(cr.id)) continue;
+      if (Math.hypot(b.x - cr.x, b.y - cr.y) < cr.r + 5) {
+        cr.hp -= b.dmg;
+        if (b.hitIds) b.hitIds.add(cr.id); // pierce: keep going
+        else b.hit = true;                  // no pierce: stop
+        if (cr.hp <= 0) dominateCreature(cr);
+        if (!g.boltPierce) break;
+      }
+    }
+  }
+
+  g.bolts     = g.bolts.filter(b => !b.hit && b.age < 2.2 && Math.hypot(b.x - g.px, b.y - g.py) < Math.max(W, H));
+  g.creatures = g.creatures.filter(c => c.hp > 0);
+
+  // Thralls killed by enemies break free
+  const deadThralls = g.thralls.filter(th => th.hp <= 0);
+  for (const th of deadThralls) {
+    addFloater(th.x, th.y - 18, 'BROKEN FREE', '#ef4444');
+    spawnParticles(th.x, th.y, '#ef4444', 14);
+    spawnParticles(th.x, th.y, '#a855f7', 5);
+  }
+  if (deadThralls.length > 0) {
+    g.thralls = g.thralls.filter(th => th.hp > 0);
+    recalcThrallOrbits();
+    updateThrallPanel();
+  }
+
+  for (const p of g.particles) { p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.alpha -= 0.025; }
+  g.particles = g.particles.filter(p => p.alpha > 0);
+  for (const f of g.floaters) { f.y -= 0.8; f.alpha -= 0.02; }
+  g.floaters  = g.floaters.filter(f => f.alpha > 0);
+
+  if (g.creatures.length === 0 && g.creaturesLeft === 0) {
+    if (g.wave >= 10) endGame(true);
+    else { g.waveState = 'upgrading'; setTimeout(showUpgrades, 600); }
+  }
+  if (g.hp <= 0) { g.hp = 0; endGame(false); }
+}
+
+function recalcThrallOrbits() {
+  const totalRings = Math.max(1, Math.ceil(g.thralls.length / 6));
+  const scale = 1 + (totalRings - 1) * 0.45;
+  for (let i = 0; i < g.thralls.length; i++) {
+    const ring = Math.floor(i / 6);
+    g.thralls[i].orbitR = (g.thrallOrbitBase + ring * Math.min(W, H) * 0.075) * scale;
+  }
+}
+
+function dominateCreature(cr) {
+  g.totalDominated++;
+  g.essence += cr.essence;
+  addFloater(cr.x, cr.y - 18, `+${cr.essence}`, '#22d3ee');
+  spawnParticles(cr.x, cr.y, '#a855f7', 14);
+  spawnParticles(cr.x, cr.y, '#22d3ee', 5);
+
+  const idx = g.thralls.length;
+  g.thralls.push({
+    x: cr.x, y: cr.y,
+    angle: Math.atan2(cr.y - g.py, cr.x - g.px),
+    orbitR: g.thrallOrbitBase,
+    orbitSpeed: 0.45 + Math.random() * 0.55,
+    fireCooldown: Math.random(),
+    color: THRALL_COLORS[idx % THRALL_COLORS.length],
+    type: cr.type, r: cr.r * 0.85, emoji: cr.emoji,
+    wave: g.wave,
+    id: Math.random(),
+    hp: Math.round(CREATURES[cr.type].baseHp * 3.0 * Math.pow(1.2, g.wave - 1)),
+    maxHp: Math.round(CREATURES[cr.type].baseHp * 3.0 * Math.pow(1.2, g.wave - 1)),
+  });
+  recalcThrallOrbits();
+  updateThrallPanel();
+}
+
+function firePlayerBolts() {
+  const targets = nearestCreatures(g.px, g.py, g.boltRange, g.multibolt);
+  for (const t of targets) {
+    const dx = t.x - g.px, dy = t.y - g.py, dist = Math.hypot(dx, dy);
+    g.bolts.push({ x: g.px, y: g.py, vx: (dx/dist)*g.boltSpeed, vy: (dy/dist)*g.boltSpeed, dmg: g.boltDmg, age: 0, owner: 'player', hitIds: g.boltPierce ? new Set() : null });
+  }
+}
+
+function fireThrallBolt(th) {
+  const targets = nearestCreatures(th.x, th.y, g.boltRange * 1.15, 1);
+  for (const t of targets) {
+    const dx = t.x - th.x, dy = t.y - th.y, dist = Math.hypot(dx, dy);
+    g.bolts.push({ x: th.x, y: th.y, vx: (dx/dist)*g.boltSpeed*0.82, vy: (dy/dist)*g.boltSpeed*0.82, dmg: Math.round(g.boltDmg * 0.38), age: 0, owner: 'thrall', color: th.color, hitIds: g.boltPierce ? new Set() : null });
+  }
+}
+
+function nearestCreatures(x, y, range, count) {
+  return g.creatures
+    .map(c => ({ c, d: Math.hypot(c.x - x, c.y - y) }))
+    .filter(o => o.d < range)
+    .sort((a, b) => a.d - b.d)
+    .slice(0, count)
+    .map(o => o.c);
+}
+
+function spawnParticles(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    const ang = Math.random() * Math.PI * 2, spd = 1 + Math.random() * 4;
+    g.particles.push({ x, y, vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd - 2, color, alpha: 1, r: 2 + Math.random() * 3 });
+  }
+}
+
+function addFloater(x, y, text, color) { g.floaters.push({ x, y, text, color, alpha: 1 }); }
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function render() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0a0a14'; ctx.fillRect(0, 0, W, H);
+
+  // Scrolling grid in screen space (uses camera offset for parallax feel)
+  const camX = W/2 - g.px;
+  const camY = H/2 - g.py;
+  const gs = 44;
+  const offX = ((camX % gs) + gs) % gs;
+  const offY = ((camY % gs) + gs) % gs;
+  ctx.strokeStyle = '#0e0e20'; ctx.lineWidth = 1;
+  for (let x = offX - gs; x < W + gs; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = offY - gs; y < H + gs; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+  // Soft radial vignette in screen space — keeps focus on the action
+  const edgeGrad = ctx.createRadialGradient(CX, CY, Math.min(W,H)*0.35, CX, CY, Math.max(W,H)*0.7);
+  edgeGrad.addColorStop(0, 'rgba(0,0,0,0)');
+  edgeGrad.addColorStop(1, 'rgba(76,29,149,0.32)');
+  ctx.fillStyle = edgeGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Translate to world space — everything below renders with camera offset
+  ctx.save();
+  ctx.translate(camX, camY);
+
+  // Player trail
+  for (const t of g.trail) {
+    ctx.globalAlpha = t.alpha * 0.45;
+    ctx.beginPath(); ctx.arc(t.x, t.y, 10, 0, Math.PI * 2);
+    ctx.fillStyle = '#7c3aed'; ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Bolt range ring
+  ctx.strokeStyle = 'rgba(168,85,247,0.05)'; ctx.lineWidth = 1; ctx.setLineDash([5, 7]);
+  ctx.beginPath(); ctx.arc(g.px, g.py, g.boltRange, 0, Math.PI * 2); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Thralls — smooth circle with bright cyan psionic halo (clearly "yours")
+  for (const th of g.thralls) {
+    // Pulsing psionic binding ring
+    const pulse = Math.sin(g.frame * 0.08 + th.id * 10) * 1.5;
+    ctx.shadowColor = '#22d3ee'; ctx.shadowBlur = 14;
+    ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.arc(th.x, th.y, th.r + 4 + pulse, 0, Math.PI * 2); ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Inner body
+    ctx.beginPath(); ctx.arc(th.x, th.y, th.r, 0, Math.PI * 2);
+    ctx.fillStyle = th.color + 'cc'; ctx.fill();
+    ctx.strokeStyle = '#a855f7'; ctx.lineWidth = 1.2; ctx.stroke();
+
+    ctx.font = `${Math.round(th.r * 1.4)}px serif`; ctx.textAlign = 'center';
+    ctx.fillText('😵', th.x, th.y + th.r * 0.4);
+
+    // HP bar — only shown when damaged
+    if (th.hp < th.maxHp) {
+      const hpPct = Math.max(0, th.hp / th.maxHp);
+      ctx.fillStyle = '#12122a';
+      ctx.fillRect(th.x - th.r, th.y + th.r + 3, th.r * 2, 3);
+      ctx.fillStyle = hpPct > 0.5 ? '#22d3ee' : hpPct > 0.25 ? '#f59e0b' : '#ef4444';
+      ctx.fillRect(th.x - th.r, th.y + th.r + 3, th.r * 2 * hpPct, 3);
+    }
+  }
+
+  // Player
+  drawAberrant(g.px, g.py, 22, '#a855f7');
+
+  // Low sanity pulse
+  if (g.hp < g.maxHp * 0.3) {
+    const flash = Math.sin(g.frame * 0.18) * 0.5 + 0.5;
+    ctx.strokeStyle = `rgba(239,68,68,${flash * 0.7})`; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(g.px, g.py, 34, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  // Creatures
+  for (const cr of g.creatures) {
+    const hpPct = cr.hp / cr.maxHp;
+    const dom = 1 - hpPct;
+    const [br, bg, bb] = CREATURES[cr.type].color;
+    const r2 = Math.round(br + (168 - br) * dom);
+    const gv = Math.round(bg + (85  - bg) * dom);
+    const bv = Math.round(bb + (247 - bb) * dom);
+
+    // Hostile spiky star shape (distinct from smooth thrall circles)
+    ctx.shadowColor = `rgb(${br},${bg},${bb})`; ctx.shadowBlur = 6;
+    ctx.fillStyle = `rgb(${r2},${gv},${bv})`;
+    ctx.strokeStyle = `rgb(${Math.round(r2*0.55)},${Math.round(gv*0.55)},${Math.round(bv*0.55)})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    const spikes = 9;
+    const rot = g.frame * 0.005 + cr.id; // slow rotation for menace
+    for (let i = 0; i < spikes * 2; i++) {
+      const ang = rot + (i / (spikes * 2)) * Math.PI * 2;
+      const rad = i % 2 === 0 ? cr.r * 1.15 : cr.r * 0.72;
+      const x = cr.x + Math.cos(ang) * rad, y = cr.y + Math.sin(ang) * rad;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.font = `${Math.round(cr.r * 1.3)}px serif`; ctx.textAlign = 'center';
+    ctx.fillText(hpPct > 0.45 ? cr.emoji : '😵‍💫', cr.x, cr.y + cr.r * 0.38);
+
+    ctx.fillStyle = '#1f2937'; ctx.fillRect(cr.x - cr.r, cr.y - cr.r - 7, cr.r * 2, 4);
+    ctx.fillStyle = hpPct > 0.5 ? '#ef4444' : '#a855f7';
+    ctx.fillRect(cr.x - cr.r, cr.y - cr.r - 7, cr.r * 2 * hpPct, 4);
+  }
+
+  // Bolts
+  for (const b of g.bolts) {
+    const color = b.owner === 'player' ? '#22d3ee' : (b.color || '#22d3ee');
+    ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(Math.atan2(b.vy, b.vx));
+    ctx.shadowColor = color; ctx.shadowBlur = 14;
+    ctx.fillStyle = color; ctx.beginPath(); ctx.ellipse(0, 0, 7, 3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0; ctx.restore();
+  }
+
+  // Particles
+  for (const p of g.particles) {
+    ctx.globalAlpha = p.alpha;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = p.color; ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Floaters
+  ctx.textAlign = 'center';
+  for (const f of g.floaters) {
+    ctx.globalAlpha = f.alpha; ctx.font = 'bold 12px Arial';
+    ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
+
+  // Done drawing world entities — restore to screen space
+  ctx.restore();
+
+  // Wave-complete message in screen space
+  if (g.waveState === 'upgrading') {
+    ctx.fillStyle = 'rgba(8,8,15,0.75)'; ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center'; ctx.font = 'bold 24px Arial';
+    ctx.fillStyle = '#a855f7'; ctx.shadowColor = '#a855f7'; ctx.shadowBlur = 28;
+    ctx.fillText('PSIONIC SURGE', CX, CY);
+    ctx.shadowBlur = 0; ctx.font = '13px Arial'; ctx.fillStyle = '#374151';
+    ctx.fillText('Choose your evolution...', CX, CY + 30);
+  }
+
+  drawHUD();
+}
+
+function drawHUD() {
+  const pad = 20;
+
+  // Wave — top center
+  ctx.textAlign = 'center'; ctx.shadowBlur = 0;
+  ctx.font = 'bold 14px Arial'; ctx.fillStyle = '#a855f7';
+  ctx.fillText(`WAVE ${g.wave} / 10`, CX, pad + 18);
+  ctx.font = '11px Arial'; ctx.fillStyle = '#2d3748';
+  const lbl = (g.creaturesLeft > 0 || g.creatures.length > 0) ? `${g.creatures.length} remaining` : 'wave cleared';
+  ctx.fillText(lbl, CX, pad + 34);
+
+  // Essence + thrall count — top right (offset for thrall panel)
+  const rPad = 170;
+  ctx.textAlign = 'right';
+  ctx.font = 'bold 14px Arial'; ctx.fillStyle = '#22d3ee';
+  ctx.fillText(`${Math.round(g.essence).toLocaleString()} essence`, W - rPad, pad + 18);
+  ctx.font = '11px Arial'; ctx.fillStyle = '#2d3748';
+  ctx.fillText(`${g.thralls.length} thralls`, W - rPad, pad + 34);
+
+  // Sanity bar — bottom, full width
+  const bPad = 50, barH = 10;
+  const barW = W - bPad * 2, barX = bPad, barY = H - pad - barH;
+  const hpPct = Math.max(0, g.hp / g.maxHp);
+  const hpColor = hpPct > 0.5 ? '#a855f7' : hpPct > 0.25 ? '#f59e0b' : '#ef4444';
+
+  ctx.textAlign = 'left'; ctx.font = '10px Arial'; ctx.fillStyle = '#2d3748';
+  ctx.fillText('SANITY', barX, barY - 7);
+  ctx.textAlign = 'right'; ctx.fillStyle = '#2d3748';
+  ctx.fillText(`${Math.max(0, Math.round(g.hp))} / ${g.maxHp}`, barX + barW, barY - 7);
+
+  ctx.fillStyle = '#12122a'; rrect(barX, barY, barW, barH, 5); ctx.fill();
+  if (hpPct > 0) {
+    ctx.shadowColor = hpColor; ctx.shadowBlur = 8;
+    ctx.fillStyle = hpColor; rrect(barX, barY, barW * hpPct, barH, 5); ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // Offscreen battle arrows — flash when a thrall is under attack outside viewport
+  const camX = W / 2 - g.px, camY = H / 2 - g.py;
+  const arrowMargin = 36;
+  const flashOn = Math.sin(g.frame * 0.25) > 0;
+  for (const th of g.thralls) {
+    if (!th.underAttack) continue;
+    const sx = th.x + camX, sy = th.y + camY;
+    if (sx >= arrowMargin && sx <= W - arrowMargin && sy >= arrowMargin && sy <= H - arrowMargin) continue;
+    const dx = sx - CX, dy = sy - CY;
+    const angle = Math.atan2(dy, dx);
+    const hw = W / 2 - arrowMargin, hh = H / 2 - arrowMargin;
+    const ac = Math.abs(Math.cos(angle)), as = Math.abs(Math.sin(angle));
+    const t = ac < 0.001 ? hh / as : as < 0.001 ? hw / ac : Math.min(hw / ac, hh / as);
+    const edgeX = CX + Math.cos(angle) * t;
+    const edgeY = CY + Math.sin(angle) * t;
+    ctx.save();
+    ctx.translate(edgeX, edgeY);
+    ctx.rotate(angle);
+    ctx.globalAlpha = flashOn ? 1 : 0.35;
+    ctx.fillStyle = '#ef4444';
+    ctx.shadowColor = '#ef4444'; ctx.shadowBlur = flashOn ? 14 : 0;
+    ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(-7, 8); ctx.lineTo(-7, -8); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+}
+
+function rrect(x, y, w, h, r) {
+  if (w <= 0) return;
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+
+function drawAberrant(x, y, size, color) {
+  ctx.shadowColor = color; ctx.shadowBlur = 26;
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + Math.sin(g.frame * 0.04 + i * 1.1) * 0.35;
+    ctx.strokeStyle = color + '66'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(x, y);
+    ctx.quadraticCurveTo(x + Math.cos(a + 0.9) * size * 0.65, y + Math.sin(a + 0.9) * size * 0.65, x + Math.cos(a) * size * 1.2, y + Math.sin(a) * size * 1.2);
+    ctx.stroke();
+  }
+  ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y, size * 0.72, 0, Math.PI * 2); ctx.fill();
+  const gr = ctx.createRadialGradient(x - size * 0.22, y - size * 0.22, 0, x, y, size * 0.72);
+  gr.addColorStop(0, 'rgba(255,255,255,0.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, size * 0.72, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
+function updateThrallPanel() {
+  const panel  = document.getElementById('thrallPanel');
+  const empty  = document.getElementById('tpEmpty');
+  const list   = document.getElementById('tpList');
+  const thralls = g.thralls;
+
+  panel.style.display = 'flex';
+  document.getElementById('tpHeader').textContent = `Your Thralls (${thralls.length})`;
+  empty.style.display = thralls.length === 0 ? 'block' : 'none';
+  list.innerHTML = '';
+
+  // Show most recent 12, newest first
+  const shown = thralls.slice().reverse().slice(0, 12);
+  for (const th of shown) {
+    const hpPct = th.hp / th.maxHp;
+    const dotColor = hpPct > 0.6 ? th.color : hpPct > 0.3 ? '#f59e0b' : '#ef4444';
+    const el = document.createElement('div');
+    el.className = 'tp-node';
+    el.innerHTML = `
+      <div class="tp-dot" style="background:${dotColor}"></div>
+      <span class="tp-name">${th.emoji} ${CREATURE_LABELS[th.type] || th.type}</span>
+      <span class="tp-wave">W${th.wave}</span>
+    `;
+    list.appendChild(el);
+  }
+  if (thralls.length > 12) {
+    const more = document.createElement('div');
+    more.style.cssText = 'font-size:9px;color:#1f2937;padding:5px 12px;';
+    more.textContent = `+ ${thralls.length - 12} more`;
+    list.appendChild(more);
+  }
+}
+
+// ── UPGRADES ──────────────────────────────────────────────────────────────────
+function showUpgrades() {
+  const pool = UPGRADES
+    .filter(u => !u.unique || !g.acquiredUpgrades.has(u.id))
+    .filter(u => !u.requires  || g.acquiredUpgrades.has(u.requires))
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 3);
+
+  const cards = document.getElementById('upgradeCards');
+  cards.innerHTML = '';
+  for (const up of pool) {
+    const el = document.createElement('div');
+    el.className = 'upgrade-card';
+    el.innerHTML = `<div class="u-icon">${up.icon}</div><div class="u-name">${up.name}</div><div class="u-desc">${up.desc}</div>`;
+    el.onclick = () => {
+      up.apply(g);
+      if (up.unique) g.acquiredUpgrades.add(up.id);
+      document.getElementById('upgradeOverlay').style.display = 'none';
+      g.wave++; g.waveState = 'active'; g.creaturesLeft = 0;
+      spawnWave(g.wave);
+    };
+    cards.appendChild(el);
+  }
+  document.getElementById('upgradeOverlay').style.display = 'flex';
+}
+
+// ── GAME OVER ─────────────────────────────────────────────────────────────────
+function endGame(won) {
+  g.waveState = 'gameover';
+  document.getElementById('goTitle').textContent = won ? '🧠 Hive Ascendant!' : '💀 Mind Shattered';
+  document.getElementById('goResult').textContent = won
+    ? `You dominated all 10 waves. ${g.thralls.length} creatures bound to your will.`
+    : `Your hold broke on wave ${g.wave}. ${g.totalDominated} creatures dominated.`;
+  document.getElementById('goEssence').textContent = `${Math.round(g.essence).toLocaleString()} essence harvested`;
+  document.getElementById('gameoverOverlay').style.display = 'flex';
+}
+
+function restartGame() {
+  document.getElementById('gameoverOverlay').style.display = 'none';
+  document.getElementById('upgradeOverlay').style.display = 'none';
+  resetGame();
+  updateThrallPanel();
+}
+
+// ── LOOP ──────────────────────────────────────────────────────────────────────
+function loop(ts) {
+  const dt = Math.min((ts - g.lastTime) / 1000, 0.05);
+  g.lastTime = ts;
+  update(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>
