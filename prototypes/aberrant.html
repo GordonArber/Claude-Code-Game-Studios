@@ -214,7 +214,7 @@ function resetGame() {
     boltPierce: false,
     multibolt: 1,
     boltCooldown: 0,
-    thrallFireRate: 0.50,
+    thrallFireRate: 0.32,
     thrallAttackSpeed: 1,
     acquiredUpgrades: new Set(),
     wave: 1,
@@ -510,7 +510,7 @@ function fireThrallBolt(th) {
   const targets = nearestCreatures(th.x, th.y, g.boltRange * 1.15, 1);
   for (const t of targets) {
     const dx = t.x - th.x, dy = t.y - th.y, dist = Math.hypot(dx, dy);
-    g.bolts.push({ x: th.x, y: th.y, vx: (dx/dist)*g.boltSpeed*0.82, vy: (dy/dist)*g.boltSpeed*0.82, dmg: Math.round(g.boltDmg * 0.38), age: 0, owner: 'thrall', color: th.color, hitIds: g.boltPierce ? new Set() : null });
+    g.bolts.push({ x: th.x, y: th.y, vx: (dx/dist)*g.boltSpeed*0.82, vy: (dy/dist)*g.boltSpeed*0.82, dmg: Math.round(g.boltDmg * 0.26), age: 0, owner: 'thrall', color: th.color, hitIds: g.boltPierce ? new Set() : null });
   }
 }
 
