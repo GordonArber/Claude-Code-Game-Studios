@@ -133,7 +133,7 @@ canvas { display: block; }
 
 <!-- ── THRALL PANEL ───────────────────────────────────────────────────────── -->
 <div id="thrallPanel">
-  <div class="tp-header">Your Thralls</div>
+  <div class="tp-header" id="tpHeader">Your Thralls</div>
   <div class="tp-empty" id="tpEmpty">No thralls yet</div>
   <div class="tp-list" id="tpList"></div>
 </div>
@@ -180,6 +180,7 @@ const UPGRADES = [
   { id:'carap',   icon:'🌑', name:'Eldritch Carapace',  desc:'+60 max sanity, restore to 80%',        apply: g => { g.maxHp += 60; g.hp = Math.max(g.hp, g.maxHp * 0.80); } },
   { id:'lance',   icon:'🌊', name:'Void Lance',         desc:'Bolt speed +45%',                       apply: g => { g.boltSpeed *= 1.45; } },
   { id:'drain',   icon:'🧿', name:'Aberrant Drain',     desc:'Siphon 8 essence/sec passively',        apply: g => { g.passiveDrain += 8; } },
+  { id:'capacity',icon:'🐙', name:'Cerebral Capacity',  desc:'+2 thrall slots',                       apply: g => { g.maxThralls += 2; } },
   { id:'split',   icon:'🧠', name:'Split Consciousness',  unique: true,                          desc:'Fire at 2 targets simultaneously',           apply: g => { g.multibolt = 2; } },
   { id:'pierce',  icon:'🔮', name:'Psionic Pierce',       unique: true, requires: 'split',      desc:'Upgrade: bolts pierce through all enemies',  apply: g => { g.boltPierce = true; } },
 ];
@@ -223,6 +224,7 @@ function resetGame() {
     creaturesLeft: 0,
     totalDominated: 0,
     thralls: [],
+    maxThralls: 5,
     creatures: [],
     bolts: [],
     particles: [],
@@ -411,6 +413,16 @@ function update(dt) {
 
 function dominateCreature(cr) {
   g.totalDominated++;
+
+  // At cap — kill gives bonus essence but no new thrall
+  if (g.thralls.length >= g.maxThralls) {
+    const bonus = Math.round(cr.essence * 1.5);
+    g.essence += bonus;
+    addFloater(cr.x, cr.y - 18, `+${bonus} (cap!)`, '#f59e0b');
+    spawnParticles(cr.x, cr.y, '#f59e0b', 10);
+    return;
+  }
+
   g.essence += cr.essence;
   addFloater(cr.x, cr.y - 18, `+${cr.essence}`, '#22d3ee');
   spawnParticles(cr.x, cr.y, '#a855f7', 14);
@@ -624,8 +636,9 @@ function drawHUD() {
   ctx.textAlign = 'right';
   ctx.font = 'bold 14px Arial'; ctx.fillStyle = '#22d3ee';
   ctx.fillText(`${Math.round(g.essence).toLocaleString()} essence`, W - rPad, pad + 18);
-  ctx.font = '11px Arial'; ctx.fillStyle = '#2d3748';
-  ctx.fillText(`${g.thralls.length} thralls`, W - rPad, pad + 34);
+  const atCap = g.thralls.length >= g.maxThralls;
+  ctx.font = '11px Arial'; ctx.fillStyle = atCap ? '#f59e0b' : '#2d3748';
+  ctx.fillText(`${g.thralls.length} / ${g.maxThralls} thralls${atCap ? ' (full)' : ''}`, W - rPad, pad + 34);
 
   // Sanity bar — bottom, full width
   const bPad = 50, barH = 10;
@@ -680,6 +693,7 @@ function updateThrallPanel() {
   const thralls = g.thralls;
 
   panel.style.display = 'flex';
+  document.getElementById('tpHeader').textContent = `Your Thralls (${thralls.length}/${g.maxThralls})`;
   empty.style.display = thralls.length === 0 ? 'block' : 'none';
   list.innerHTML = '';
 
