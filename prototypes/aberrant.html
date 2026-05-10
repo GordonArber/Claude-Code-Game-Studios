@@ -176,8 +176,8 @@ const UPGRADES = [
   { id:'carap',   icon:'🌑', name:'Eldritch Carapace',  desc:'+60 max sanity, restore to 80%',        apply: g => { g.maxHp += 60; g.hp = Math.max(g.hp, g.maxHp * 0.80); } },
   { id:'lance',   icon:'🌊', name:'Void Lance',         desc:'Bolt speed +45%',                       apply: g => { g.boltSpeed *= 1.45; } },
   { id:'drain',   icon:'🧿', name:'Aberrant Drain',     desc:'Siphon 8 essence/sec passively',        apply: g => { g.passiveDrain += 8; } },
-  { id:'pierce',  icon:'🔮', name:'Psionic Pierce',       unique: true, desc:'Bolts pass through all enemies',       apply: g => { g.boltPierce = true; } },
-  { id:'split',   icon:'🧠', name:'Split Consciousness',  unique: true, desc:'Fire at 2 targets simultaneously',     apply: g => { g.multibolt = 2; } },
+  { id:'split',   icon:'🧠', name:'Split Consciousness',  unique: true,                          desc:'Fire at 2 targets simultaneously',           apply: g => { g.multibolt = 2; } },
+  { id:'pierce',  icon:'🔮', name:'Psionic Pierce',       unique: true, requires: 'split',      desc:'Upgrade: bolts pierce through all enemies',  apply: g => { g.boltPierce = true; } },
 ];
 
 // ── CREATURE DEFINITIONS ──────────────────────────────────────────────────────
@@ -628,6 +628,7 @@ function updateThrallPanel() {
 function showUpgrades() {
   const pool = UPGRADES
     .filter(u => !u.unique || !g.acquiredUpgrades.has(u.id))
+    .filter(u => !u.requires  || g.acquiredUpgrades.has(u.requires))
     .sort(() => Math.random() - 0.5)
     .slice(0, 3);
 
