@@ -73,6 +73,31 @@ canvas { display: block; }
   transition: background 0.15s;
 }
 .restart-btn:hover { background: #a855f7; }
+
+#thrallPanel {
+  position: fixed; top: 60px; right: 0;
+  width: 158px;
+  max-height: calc(100vh - 120px);
+  background: rgba(8,8,15,0.82);
+  border-left: 1px solid #1f2937;
+  display: none; flex-direction: column;
+  overflow: hidden; z-index: 50;
+}
+#thrallPanel .tp-header {
+  font-size: 8px; letter-spacing: 3px; color: #2d3748;
+  text-transform: uppercase; padding: 10px 12px 6px;
+  border-bottom: 1px solid #111827;
+}
+#thrallPanel .tp-empty { font-size: 10px; color: #1f2937; padding: 10px 12px; }
+#thrallPanel .tp-list { overflow-y: auto; flex: 1; }
+.tp-node {
+  display: flex; align-items: center; gap: 7px;
+  padding: 5px 12px; border-bottom: 1px solid #0f0f1e;
+  font-size: 10px; color: #4b5563;
+}
+.tp-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.tp-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tp-wave { font-size: 9px; color: #1f2937; flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -104,6 +129,13 @@ canvas { display: block; }
   </div>
 
   <button class="begin-btn" onclick="beginGame()">BEGIN DOMINATION</button>
+</div>
+
+<!-- ── THRALL PANEL ───────────────────────────────────────────────────────── -->
+<div id="thrallPanel">
+  <div class="tp-header">Your Thralls</div>
+  <div class="tp-empty" id="tpEmpty">No thralls yet</div>
+  <div class="tp-list" id="tpList"></div>
 </div>
 
 <!-- ── UPGRADE OVERLAY ───────────────────────────────────────────────────── -->
@@ -144,7 +176,8 @@ const UPGRADES = [
   { id:'carap',   icon:'🌑', name:'Eldritch Carapace',  desc:'+60 max sanity, restore to 80%',        apply: g => { g.maxHp += 60; g.hp = Math.max(g.hp, g.maxHp * 0.80); } },
   { id:'lance',   icon:'🌊', name:'Void Lance',         desc:'Bolt speed +45%',                       apply: g => { g.boltSpeed *= 1.45; } },
   { id:'drain',   icon:'🧿', name:'Aberrant Drain',     desc:'Siphon 8 essence/sec passively',        apply: g => { g.passiveDrain += 8; } },
-  { id:'pierce',  icon:'🔮', name:'Psionic Pierce', unique: true, desc:'Bolts pass through all enemies', apply: g => { g.boltPierce = true; } },
+  { id:'pierce',  icon:'🔮', name:'Psionic Pierce',       unique: true, desc:'Bolts pass through all enemies',       apply: g => { g.boltPierce = true; } },
+  { id:'split',   icon:'🧠', name:'Split Consciousness',  unique: true, desc:'Fire at 2 targets simultaneously',     apply: g => { g.multibolt = 2; } },
 ];
 
 // ── CREATURE DEFINITIONS ──────────────────────────────────────────────────────
@@ -156,9 +189,11 @@ const CREATURES = {
 const THRALL_COLORS = ['#e879f9','#38bdf8','#4ade80','#fb923c','#f472b6','#a3e635','#67e8f9'];
 
 let g = {};
+const CREATURE_LABELS = { gnoll: 'Feral Gnoll', beholder: 'Irrad. Beholder', troll: 'Mutant Troll' };
 
 function beginGame() {
   document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('thrallPanel').style.display = 'flex';
   resetGame();
   requestAnimationFrame(ts => { g.lastTime = ts; requestAnimationFrame(loop); });
 }
@@ -174,6 +209,7 @@ function resetGame() {
     boltSpeed: 300,
     boltRange: Math.min(W, H) * 0.4,
     boltPierce: false,
+    multibolt: 1,
     boltCooldown: 0,
     thrallFireRate: 0.5,
     thrallAttackSpeed: 1,
@@ -344,11 +380,13 @@ function dominateCreature(cr) {
     fireCooldown: Math.random(),
     color: THRALL_COLORS[idx % THRALL_COLORS.length],
     type: cr.type, r: cr.r * 0.85, emoji: cr.emoji,
+    wave: g.wave,
   });
+  updateThrallPanel();
 }
 
 function firePlayerBolts() {
-  const targets = nearestCreatures(g.px, g.py, g.boltRange, 1);
+  const targets = nearestCreatures(g.px, g.py, g.boltRange, g.multibolt);
   for (const t of targets) {
     const dx = t.x - g.px, dy = t.y - g.py, dist = Math.hypot(dx, dy);
     g.bolts.push({ x: g.px, y: g.py, vx: (dx/dist)*g.boltSpeed, vy: (dy/dist)*g.boltSpeed, dmg: g.boltDmg, age: 0, owner: 'player', hitIds: g.boltPierce ? new Set() : null });
@@ -502,12 +540,13 @@ function drawHUD() {
   const lbl = (g.creaturesLeft > 0 || g.creatures.length > 0) ? `${g.creatures.length} remaining` : 'wave cleared';
   ctx.fillText(lbl, CX, pad + 34);
 
-  // Essence + thrall count — top right
+  // Essence + thrall count — top right (offset for thrall panel)
+  const rPad = 170;
   ctx.textAlign = 'right';
   ctx.font = 'bold 14px Arial'; ctx.fillStyle = '#22d3ee';
-  ctx.fillText(`${Math.round(g.essence).toLocaleString()} essence`, W - pad, pad + 18);
+  ctx.fillText(`${Math.round(g.essence).toLocaleString()} essence`, W - rPad, pad + 18);
   ctx.font = '11px Arial'; ctx.fillStyle = '#2d3748';
-  ctx.fillText(`${g.thralls.length} thralls bound`, W - pad, pad + 34);
+  ctx.fillText(`${g.thralls.length} thralls`, W - rPad, pad + 34);
 
   // Sanity bar — bottom, full width
   const bPad = 50, barH = 10;
@@ -555,6 +594,36 @@ function drawAberrant(x, y, size, color) {
   ctx.shadowBlur = 0;
 }
 
+function updateThrallPanel() {
+  const panel  = document.getElementById('thrallPanel');
+  const empty  = document.getElementById('tpEmpty');
+  const list   = document.getElementById('tpList');
+  const thralls = g.thralls;
+
+  panel.style.display = 'flex';
+  empty.style.display = thralls.length === 0 ? 'block' : 'none';
+  list.innerHTML = '';
+
+  // Show most recent 12, newest first
+  const shown = thralls.slice().reverse().slice(0, 12);
+  for (const th of shown) {
+    const el = document.createElement('div');
+    el.className = 'tp-node';
+    el.innerHTML = `
+      <div class="tp-dot" style="background:${th.color}"></div>
+      <span class="tp-name">${th.emoji} ${CREATURE_LABELS[th.type] || th.type}</span>
+      <span class="tp-wave">W${th.wave}</span>
+    `;
+    list.appendChild(el);
+  }
+  if (thralls.length > 12) {
+    const more = document.createElement('div');
+    more.style.cssText = 'font-size:9px;color:#1f2937;padding:5px 12px;';
+    more.textContent = `+ ${thralls.length - 12} more`;
+    list.appendChild(more);
+  }
+}
+
 // ── UPGRADES ──────────────────────────────────────────────────────────────────
 function showUpgrades() {
   const pool = UPGRADES
@@ -595,6 +664,7 @@ function restartGame() {
   document.getElementById('gameoverOverlay').style.display = 'none';
   document.getElementById('upgradeOverlay').style.display = 'none';
   resetGame();
+  updateThrallPanel();
 }
 
 // ── LOOP ──────────────────────────────────────────────────────────────────────
