@@ -161,9 +161,9 @@ canvas.height = window.innerHeight;
 const W = canvas.width, H = canvas.height;
 const CX = W/2, CY = H/2;
 
-// Arena — all gameplay stays inside this rectangle
-const AP = 70; // padding from screen edges
-const ARENA = { x: AP, y: AP, w: W - AP*2, h: H - AP*2 };
+// Arena = full viewport. Hard clamp at screen edges feels natural because
+// the boundary lines up with what the player already perceives as "off-screen".
+const ARENA = { x: 0, y: 0, w: W, h: H };
 
 const keys = {};
 document.addEventListener('keydown', e => { keys[e.key] = true; if (!['F5','F12'].includes(e.key)) e.preventDefault(); });
@@ -215,7 +215,7 @@ function resetGame() {
     boltPierce: false,
     multibolt: 1,
     boltCooldown: 0,
-    thrallFireRate: 0.5,
+    thrallFireRate: 0.32,
     thrallAttackSpeed: 1,
     acquiredUpgrades: new Set(),
     wave: 1,
@@ -238,7 +238,7 @@ function resetGame() {
 // ── WAVE SPAWNING ──────────────────────────────────────────────────────────────
 function spawnWave(wave) {
   // Wave 1 = 6 slow gnolls only. Scales steeply.
-  const count = 4 + Math.floor(wave * 3.5);
+  const count = 8 + Math.floor(wave * 5);
   g.creaturesLeft = count;
 
   for (let i = 0; i < count; i++) {
@@ -246,7 +246,7 @@ function spawnWave(wave) {
       if (g.waveState !== 'active') return;
       spawnCreature(wave);
       g.creaturesLeft--;
-    }, i * Math.max(70, 900 - wave * 70));
+    }, i * Math.max(35, 550 - wave * 55));
   }
 }
 
@@ -269,7 +269,7 @@ function spawnCreature(wave) {
   for (let i = 0; i < avail.length; i++) { roll -= weights[i]; if (roll <= 0) { type = avail[i][0]; break; } }
 
   const def = CREATURES[type];
-  const speedBoost = 1 + (wave - 1) * 0.22;
+  const speedBoost = 1 + (wave - 1) * 0.28;
   const hp  = Math.round(def.baseHp * Math.pow(1.4, wave - 1)); // exponential HP
   const dmg = def.baseDmg + (wave - 1) * 5;
   const ess = def.essence + wave * 25;
@@ -447,7 +447,7 @@ function fireThrallBolt(th) {
   const targets = nearestCreatures(th.x, th.y, g.boltRange * 1.15, 1);
   for (const t of targets) {
     const dx = t.x - th.x, dy = t.y - th.y, dist = Math.hypot(dx, dy);
-    g.bolts.push({ x: th.x, y: th.y, vx: (dx/dist)*g.boltSpeed*0.82, vy: (dy/dist)*g.boltSpeed*0.82, dmg: Math.round(g.boltDmg * 0.6), age: 0, owner: 'thrall', color: th.color, hitIds: g.boltPierce ? new Set() : null });
+    g.bolts.push({ x: th.x, y: th.y, vx: (dx/dist)*g.boltSpeed*0.82, vy: (dy/dist)*g.boltSpeed*0.82, dmg: Math.round(g.boltDmg * 0.38), age: 0, owner: 'thrall', color: th.color, hitIds: g.boltPierce ? new Set() : null });
   }
 }
 
@@ -474,18 +474,17 @@ function render() {
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = '#0a0a14'; ctx.fillRect(0, 0, W, H);
 
-  // Grid (only inside arena)
+  // Grid
   ctx.strokeStyle = '#0e0e20'; ctx.lineWidth = 1;
-  ctx.save(); ctx.beginPath(); ctx.rect(ARENA.x, ARENA.y, ARENA.w, ARENA.h); ctx.clip();
   for (let x = 0; x < W; x += 44) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
   for (let y = 0; y < H; y += 44) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
-  ctx.restore();
 
-  // Arena border
-  ctx.shadowColor = '#4c1d95'; ctx.shadowBlur = 18;
-  ctx.strokeStyle = '#2d1b69'; ctx.lineWidth = 2;
-  ctx.strokeRect(ARENA.x, ARENA.y, ARENA.w, ARENA.h);
-  ctx.shadowBlur = 0;
+  // Edge glow as a subtle visual boundary
+  const edgeGrad = ctx.createRadialGradient(CX, CY, Math.min(W,H)*0.4, CX, CY, Math.max(W,H)*0.7);
+  edgeGrad.addColorStop(0, 'rgba(0,0,0,0)');
+  edgeGrad.addColorStop(1, 'rgba(76,29,149,0.35)');
+  ctx.fillStyle = edgeGrad;
+  ctx.fillRect(0, 0, W, H);
 
   // Player trail
   for (const t of g.trail) {
