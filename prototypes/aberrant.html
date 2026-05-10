@@ -161,9 +161,8 @@ canvas.height = window.innerHeight;
 const W = canvas.width, H = canvas.height;
 const CX = W/2, CY = H/2;
 
-// Arena = full viewport. Hard clamp at screen edges feels natural because
-// the boundary lines up with what the player already perceives as "off-screen".
-const ARENA = { x: 0, y: 0, w: W, h: H };
+// Vampire Survivors style: camera follows the player. World is unbounded.
+// camX/camY are the translation offsets so the player sits at screen center.
 
 const keys = {};
 document.addEventListener('keydown', e => { keys[e.key] = true; if (!['F5','F12'].includes(e.key)) e.preventDefault(); });
@@ -180,7 +179,6 @@ const UPGRADES = [
   { id:'carap',   icon:'🌑', name:'Eldritch Carapace',  desc:'+60 max sanity, restore to 80%',        apply: g => { g.maxHp += 60; g.hp = Math.max(g.hp, g.maxHp * 0.80); } },
   { id:'lance',   icon:'🌊', name:'Void Lance',         desc:'Bolt speed +45%',                       apply: g => { g.boltSpeed *= 1.45; } },
   { id:'drain',   icon:'🧿', name:'Aberrant Drain',     desc:'Siphon 8 essence/sec passively',        apply: g => { g.passiveDrain += 8; } },
-  { id:'capacity',icon:'🐙', name:'Cerebral Capacity',  desc:'+2 thrall slots',                       apply: g => { g.maxThralls += 2; } },
   { id:'split',   icon:'🧠', name:'Split Consciousness',  unique: true,                          desc:'Fire at 2 targets simultaneously',           apply: g => { g.multibolt = 2; } },
   { id:'pierce',  icon:'🔮', name:'Psionic Pierce',       unique: true, requires: 'split',      desc:'Upgrade: bolts pierce through all enemies',  apply: g => { g.boltPierce = true; } },
 ];
@@ -205,7 +203,7 @@ function beginGame() {
 
 function resetGame() {
   g = {
-    px: ARENA.x + ARENA.w/2, py: ARENA.y + ARENA.h/2,
+    px: 0, py: 0,
     playerSpeed: 220,
     hp: 100, maxHp: 100,
     essence: 0, passiveDrain: 0,
@@ -224,7 +222,6 @@ function resetGame() {
     creaturesLeft: 0,
     totalDominated: 0,
     thralls: [],
-    maxThralls: 5,
     creatures: [],
     bolts: [],
     particles: [],
@@ -253,14 +250,11 @@ function spawnWave(wave) {
 }
 
 function spawnCreature(wave) {
-  // Spawn just outside the arena edges — always visible on screen
-  const edge = Math.floor(Math.random() * 4);
-  let sx, sy;
-  // Spawn on the inside edge of the arena — always visible
-  if      (edge === 0) { sx = ARENA.x + 20 + Math.random() * (ARENA.w - 40); sy = ARENA.y + 20; }
-  else if (edge === 1) { sx = ARENA.x + ARENA.w - 20; sy = ARENA.y + 20 + Math.random() * (ARENA.h - 40); }
-  else if (edge === 2) { sx = ARENA.x + 20 + Math.random() * (ARENA.w - 40); sy = ARENA.y + ARENA.h - 20; }
-  else                 { sx = ARENA.x + 20; sy = ARENA.y + 20 + Math.random() * (ARENA.h - 40); }
+  // Spawn at a random angle around the player, just outside the camera view
+  const angle = Math.random() * Math.PI * 2;
+  const dist = Math.max(W, H) * 0.6;
+  const sx = g.px + Math.cos(angle) * dist;
+  const sy = g.py + Math.sin(angle) * dist;
 
   // Filter by minWave, then weight by rarity
   const avail = Object.entries(CREATURES).filter(([, d]) => d.minWave <= wave);
@@ -287,8 +281,8 @@ function updateMovement(dt) {
   if (keys['ArrowUp']    || keys['w'] || keys['W']) dy -= 1;
   if (keys['ArrowDown']  || keys['s'] || keys['S']) dy += 1;
   if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
-  g.px = Math.max(ARENA.x + 18, Math.min(ARENA.x + ARENA.w - 18, g.px + dx * g.playerSpeed * dt));
-  g.py = Math.max(ARENA.y + 18, Math.min(ARENA.y + ARENA.h - 18, g.py + dy * g.playerSpeed * dt));
+  g.px += dx * g.playerSpeed * dt;
+  g.py += dy * g.playerSpeed * dt;
 
   if (dx !== 0 || dy !== 0) {
     g.trail.push({ x: g.px, y: g.py, alpha: 0.5 });
@@ -323,9 +317,6 @@ function update(dt) {
     th.angle += dt * th.orbitSpeed;
     th.x = g.px + Math.cos(th.angle) * th.orbitR;
     th.y = g.py + Math.sin(th.angle) * th.orbitR;
-    // Clamp thralls to arena (orbit deforms near walls but stays visible)
-    th.x = Math.max(ARENA.x + th.r, Math.min(ARENA.x + ARENA.w - th.r, th.x));
-    th.y = Math.max(ARENA.y + th.r, Math.min(ARENA.y + ARENA.h - th.r, th.y));
   }
 
   // Creatures chase player; outer-ring thralls intercept ones that get very close
@@ -352,10 +343,6 @@ function update(dt) {
     if (dist < 1) continue;
     cr.x += (dx / dist) * cr.speed * dt;
     cr.y += (dy / dist) * cr.speed * dt;
-
-    // Hard clamp to arena bounds
-    cr.x = Math.max(ARENA.x + cr.r, Math.min(ARENA.x + ARENA.w - cr.r, cr.x));
-    cr.y = Math.max(ARENA.y + cr.r, Math.min(ARENA.y + ARENA.h - cr.r, cr.y));
 
     // Contact damage to target
     if (dist < (targetThrall ? 16 : 22) + cr.r) {
@@ -384,7 +371,7 @@ function update(dt) {
     }
   }
 
-  g.bolts     = g.bolts.filter(b => !b.hit && b.age < 2.2 && b.x > -100 && b.x < W + 100 && b.y > -100 && b.y < H + 100);
+  g.bolts     = g.bolts.filter(b => !b.hit && b.age < 2.2 && Math.hypot(b.x - g.px, b.y - g.py) < Math.max(W, H));
   g.creatures = g.creatures.filter(c => c.hp > 0);
 
   // Thralls killed by enemies break free
@@ -413,16 +400,6 @@ function update(dt) {
 
 function dominateCreature(cr) {
   g.totalDominated++;
-
-  // At cap — kill gives bonus essence but no new thrall
-  if (g.thralls.length >= g.maxThralls) {
-    const bonus = Math.round(cr.essence * 1.5);
-    g.essence += bonus;
-    addFloater(cr.x, cr.y - 18, `+${bonus} (cap!)`, '#f59e0b');
-    spawnParticles(cr.x, cr.y, '#f59e0b', 10);
-    return;
-  }
-
   g.essence += cr.essence;
   addFloater(cr.x, cr.y - 18, `+${cr.essence}`, '#22d3ee');
   spawnParticles(cr.x, cr.y, '#a855f7', 14);
@@ -486,17 +463,26 @@ function render() {
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = '#0a0a14'; ctx.fillRect(0, 0, W, H);
 
-  // Grid
+  // Scrolling grid in screen space (uses camera offset for parallax feel)
+  const camX = W/2 - g.px;
+  const camY = H/2 - g.py;
+  const gs = 44;
+  const offX = ((camX % gs) + gs) % gs;
+  const offY = ((camY % gs) + gs) % gs;
   ctx.strokeStyle = '#0e0e20'; ctx.lineWidth = 1;
-  for (let x = 0; x < W; x += 44) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-  for (let y = 0; y < H; y += 44) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  for (let x = offX - gs; x < W + gs; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = offY - gs; y < H + gs; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
 
-  // Edge glow as a subtle visual boundary
-  const edgeGrad = ctx.createRadialGradient(CX, CY, Math.min(W,H)*0.4, CX, CY, Math.max(W,H)*0.7);
+  // Soft radial vignette in screen space — keeps focus on the action
+  const edgeGrad = ctx.createRadialGradient(CX, CY, Math.min(W,H)*0.35, CX, CY, Math.max(W,H)*0.7);
   edgeGrad.addColorStop(0, 'rgba(0,0,0,0)');
-  edgeGrad.addColorStop(1, 'rgba(76,29,149,0.35)');
+  edgeGrad.addColorStop(1, 'rgba(76,29,149,0.32)');
   ctx.fillStyle = edgeGrad;
   ctx.fillRect(0, 0, W, H);
+
+  // Translate to world space — everything below renders with camera offset
+  ctx.save();
+  ctx.translate(camX, camY);
 
   // Player trail
   for (const t of g.trail) {
@@ -607,7 +593,10 @@ function render() {
   }
   ctx.globalAlpha = 1;
 
-  // Wave-complete message
+  // Done drawing world entities — restore to screen space
+  ctx.restore();
+
+  // Wave-complete message in screen space
   if (g.waveState === 'upgrading') {
     ctx.fillStyle = 'rgba(8,8,15,0.75)'; ctx.fillRect(0, 0, W, H);
     ctx.textAlign = 'center'; ctx.font = 'bold 24px Arial';
@@ -636,9 +625,8 @@ function drawHUD() {
   ctx.textAlign = 'right';
   ctx.font = 'bold 14px Arial'; ctx.fillStyle = '#22d3ee';
   ctx.fillText(`${Math.round(g.essence).toLocaleString()} essence`, W - rPad, pad + 18);
-  const atCap = g.thralls.length >= g.maxThralls;
-  ctx.font = '11px Arial'; ctx.fillStyle = atCap ? '#f59e0b' : '#2d3748';
-  ctx.fillText(`${g.thralls.length} / ${g.maxThralls} thralls${atCap ? ' (full)' : ''}`, W - rPad, pad + 34);
+  ctx.font = '11px Arial'; ctx.fillStyle = '#2d3748';
+  ctx.fillText(`${g.thralls.length} thralls`, W - rPad, pad + 34);
 
   // Sanity bar — bottom, full width
   const bPad = 50, barH = 10;
@@ -693,7 +681,7 @@ function updateThrallPanel() {
   const thralls = g.thralls;
 
   panel.style.display = 'flex';
-  document.getElementById('tpHeader').textContent = `Your Thralls (${thralls.length}/${g.maxThralls})`;
+  document.getElementById('tpHeader').textContent = `Your Thralls (${thralls.length})`;
   empty.style.display = thralls.length === 0 ? 'block' : 'none';
   list.innerHTML = '';
 
