@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ABERRANT — Prototype</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0d0d1a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 100vh;
+  font-family: 'Arial', sans-serif;
+  padding: 16px;
+}
+h1 { font-size: 11px; letter-spacing: 6px; color: #a855f7; margin-bottom: 2px; text-transform: uppercase; }
+.subtitle { font-size: 9px; color: #4b5563; letter-spacing: 2px; margin-bottom: 12px; }
+
+.game-wrap { display: flex; gap: 12px; align-items: flex-start; }
+
+canvas { display: block; border: 1px solid #2d1b69; background: #0a0a14; }
+
+.side-panel { width: 180px; display: flex; flex-direction: column; gap: 10px; }
+
+.card {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 6px;
+  padding: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+.card h3 {
+  font-size: 8px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #4b5563;
+  margin-bottom: 8px;
+}
+
+.stat-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 11px; }
+.stat-label { color: #4b5563; }
+.stat-val { color: #e5e7eb; font-weight: bold; font-variant-numeric: tabular-nums; }
+.stat-val.essence { color: #22d3ee; }
+
+.hp-bar { height: 8px; background: #1f2937; border-radius: 4px; overflow: hidden; margin-top: 4px; }
+.hp-fill { height: 100%; background: linear-gradient(90deg, #7c3aed, #a855f7); border-radius: 4px; transition: width 0.3s; }
+
+.wave-info {
+  font-size: 12px;
+  color: #9ca3af;
+  text-align: center;
+  padding: 8px;
+  background: #0f0f1f;
+  border-radius: 5px;
+  border: 1px solid #2d1b69;
+}
+.wave-num { font-size: 22px; font-weight: bold; color: #a855f7; display: block; }
+
+.thrall-list { max-height: 220px; overflow-y: auto; }
+.thrall-node {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px;
+  margin-bottom: 2px;
+  border-radius: 4px;
+  font-size: 10px;
+  color: #9ca3af;
+  background: #0f0f1f;
+  border: 1px solid #1f2937;
+}
+.thrall-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.thrall-indent { padding-left: 16px; }
+.thrall-tag { margin-left: auto; color: #22d3ee; font-size: 9px; }
+
+.upgrade-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(13,13,26,0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+  z-index: 100;
+  display: none;
+}
+.upgrade-overlay h2 { font-size: 11px; letter-spacing: 4px; color: #6b7280; text-transform: uppercase; }
+.upgrade-cards { display: flex; gap: 12px; }
+.upgrade-card {
+  width: 160px;
+  background: #111827;
+  border: 2px solid #2d1b69;
+  border-radius: 10px;
+  padding: 16px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  color: #e5e7eb;
+}
+.upgrade-card:hover {
+  border-color: #a855f7;
+  box-shadow: 0 4px 16px rgba(168,85,247,0.35);
+  transform: translateY(-2px);
+}
+.upgrade-card .u-icon { font-size: 32px; margin-bottom: 8px; }
+.upgrade-card .u-name { font-size: 13px; font-weight: bold; color: #e5e7eb; margin-bottom: 4px; }
+.upgrade-card .u-desc { font-size: 10px; color: #6b7280; line-height: 1.5; }
+
+.gameover-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(13,13,26,0.97);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 200;
+  display: none;
+}
+.gameover-overlay h2 { font-size: 24px; color: #e5e7eb; }
+.gameover-overlay .result { font-size: 13px; color: #6b7280; }
+.gameover-overlay .essence-total { font-size: 28px; color: #22d3ee; font-weight: bold; }
+.restart-btn {
+  background: #7c3aed;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 24px;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  letter-spacing: 2px;
+  margin-top: 8px;
+}
+.restart-btn:hover { background: #a855f7; }
+</style>
+</head>
+<body>
+
+<h1>Aberrant</h1>
+<div class="subtitle">psionic · dominator · prototype</div>
+
+<div class="game-wrap">
+
+<canvas id="c" width="500" height="500"></canvas>
+
+<div class="side-panel">
+
+  <div class="card">
+    <h3>Wave</h3>
+    <div class="wave-info">
+      <span class="wave-num" id="waveNum">1</span>
+      <span id="waveLabel">Creatures incoming</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Mind Status</h3>
+    <div class="stat-row"><span class="stat-label">Sanity</span><span class="stat-val" id="hpVal">100</span></div>
+    <div class="hp-bar"><div class="hp-fill" id="hpFill" style="width:100%"></div></div>
+    <div style="height:8px"></div>
+    <div class="stat-row"><span class="stat-label">Essence</span><span class="stat-val essence" id="commVal">0</span></div>
+    <div class="stat-row"><span class="stat-label">Thralls</span><span class="stat-val" id="thrallVal">0</span></div>
+    <div class="stat-row"><span class="stat-label">Dominated</span><span class="stat-val" id="dominatedVal">0</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Your Thralls</h3>
+    <div class="thrall-list" id="thrallList">
+      <div class="thrall-node">
+        <div class="thrall-dot" style="background:#a855f7"></div>
+        <span>You (Aberrant)</span>
+      </div>
+      <div style="font-size:10px;color:#374151;padding:4px 6px">No thralls yet</div>
+    </div>
+  </div>
+
+  <div class="card" style="font-size:10px;color:#4b5563;line-height:1.7">
+    <h3>How to Play</h3>
+    <strong style="color:#a855f7">WASD / Arrows</strong> to move.<br>
+    Psionic bolts dominate creatures.<br>
+    Thralls orbit + attack for you.<br>
+    Don't let creatures reach you.<br>
+    Survive all 10 waves to win.
+  </div>
+
+</div>
+</div>
+
+<div class="upgrade-overlay" id="upgradeOverlay">
+  <h2>🧠 Psionic Evolution — Choose an Ability</h2>
+  <div class="upgrade-cards" id="upgradeCards"></div>
+</div>
+
+<div class="gameover-overlay" id="gameoverOverlay">
+  <div style="font-size:40px">🧠</div>
+  <h2 id="goTitle">Mind Shattered</h2>
+  <div class="result" id="goResult">Your psionic hold collapsed.</div>
+  <div class="essence-total" id="goEssence">0 essence harvested</div>
+  <button class="restart-btn" onclick="restartGame()">DOMINATE AGAIN</button>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W = 500, H = 500;
+const CX = W/2, CY = H/2;
+
+const keys = {};
+document.addEventListener('keydown', e => { keys[e.key] = true; e.preventDefault(); });
+document.addEventListener('keyup',   e => { keys[e.key] = false; });
+
+// ── UPGRADES ──────────────────────────────────────────────────────────────────
+const UPGRADES = [
+  { icon:'⚡', name:'Synaptic Surge',     desc:'Bolt rate +30%',                apply: g => { g.boltRate *= 1.3; } },
+  { icon:'🛡️', name:'Neural Fortitude',   desc:'+40 max sanity, restore 25',    apply: g => { g.maxHp+=40; g.hp=Math.min(g.hp+25,g.maxHp); } },
+  { icon:'💜', name:'Mind Shatter',        desc:'Psionic damage ×1.5',           apply: g => { g.boltDmg = Math.round(g.boltDmg*1.5); } },
+  { icon:'🌀', name:'Hive Resonance',      desc:'Thralls attack 2× faster',      apply: g => { g.thrallAttackSpeed *= 2; } },
+  { icon:'👁️', name:'Psionic Reach',       desc:'Domination range +60',          apply: g => { g.boltRange += 60; } },
+  { icon:'🔗', name:'Thrall Frenzy',       desc:'Thralls fire +50% faster',      apply: g => { g.thrallFireRate *= 1.5; } },
+  { icon:'🌑', name:'Eldritch Carapace',   desc:'+60 max sanity, restore 40',    apply: g => { g.maxHp+=60; g.hp=Math.min(g.hp+40,g.maxHp); } },
+  { icon:'🌊', name:'Void Lance',          desc:'Bolt speed +40%',               apply: g => { g.boltSpeed *= 1.4; } },
+  { icon:'🧿', name:'Aberrant Drain',      desc:'Siphon 5 essence/sec passively',apply: g => { g.passiveDrain += 5; } },
+  { icon:'🧠', name:'Split Consciousness', desc:'Each bolt hits up to 2 targets',apply: g => { g.multibolt = (g.multibolt||1)+1; } },
+];
+
+// ── GAME STATE ────────────────────────────────────────────────────────────────
+const THRALL_COLORS = ['#e879f9','#38bdf8','#4ade80','#fb923c','#f472b6','#a3e635','#67e8f9'];
+
+const CREATURES = {
+  gnoll:   { label:'Feral Gnoll',        r:11, baseHp:40,  baseSpd:110, baseDmg:18, essence:100, emoji:'😤' },
+  beholder:{ label:'Irradiated Beholder',r:15, baseHp:90,  baseSpd:75,  baseDmg:25, essence:250, emoji:'👁️' },
+  troll:   { label:'Mutant Troll',        r:18, baseHp:150, baseSpd:55,  baseDmg:35, essence:400, emoji:'🧌' },
+};
+
+let g = {};
+
+function resetGame() {
+  g = {
+    px: CX, py: CY,
+    playerSpeed: 200,
+    hp: 100, maxHp: 100,
+    essence: 0, passiveDrain: 0,
+    boltRate: 1.2,
+    boltDmg: 20,
+    boltSpeed: 280,
+    boltRange: 200,
+    boltCooldown: 0,
+    thrallFireRate: 0.6,
+    thrallAttackSpeed: 1,
+    multibolt: 1,
+    wave: 1,
+    waveState: 'active',
+    creaturesLeft: 0,
+    totalDominated: 0,
+    thralls: [],
+    creatures: [],
+    bolts: [],
+    particles: [],
+    floaters: [],
+    trail: [],
+    thrallOrbitR: 55,
+    frame: 0,
+    lastTime: 0,
+  };
+  spawnWave(g.wave);
+}
+
+function spawnWave(wave) {
+  const count = 8 + wave * 4;
+  g.creaturesLeft = count;
+  document.getElementById('waveNum').textContent = wave;
+  document.getElementById('waveLabel').textContent = `${count} creatures incoming`;
+
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => {
+      if (g.waveState !== 'active') return;
+      spawnCreature(wave);
+      g.creaturesLeft--;
+    }, i * Math.max(100, 650 - wave * 45));
+  }
+}
+
+function spawnCreature(wave) {
+  const angle = Math.random() * Math.PI * 2;
+  const spawnR = 310;
+
+  // Creature type distribution shifts each wave
+  const roll = Math.random();
+  let type;
+  if (wave >= 6 && roll < 0.15) type = 'troll';
+  else if (roll < Math.min(0.5, 0.1 + wave * 0.05)) type = 'beholder';
+  else type = 'gnoll';
+
+  const def = CREATURES[type];
+  const speedBoost = 1 + wave * 0.1;
+  const hp = def.baseHp + wave * 8;
+
+  g.creatures.push({
+    x: CX + Math.cos(angle) * spawnR,
+    y: CY + Math.sin(angle) * spawnR,
+    hp, maxHp: hp,
+    speed: def.baseSpd * speedBoost,
+    damage: def.baseDmg + wave * 4,
+    essence: def.essence,
+    type,
+    r: def.r,
+    emoji: def.emoji,
+    id: Math.random(),
+  });
+}
+
+// ── MOVEMENT ──────────────────────────────────────────────────────────────────
+function updateMovement(dt) {
+  let dx = 0, dy = 0;
+  if (keys['ArrowLeft']  || keys['a'] || keys['A']) dx -= 1;
+  if (keys['ArrowRight'] || keys['d'] || keys['D']) dx += 1;
+  if (keys['ArrowUp']    || keys['w'] || keys['W']) dy -= 1;
+  if (keys['ArrowDown']  || keys['s'] || keys['S']) dy += 1;
+  if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
+
+  g.px = Math.max(18, Math.min(W-18, g.px + dx * g.playerSpeed * dt));
+  g.py = Math.max(18, Math.min(H-18, g.py + dy * g.playerSpeed * dt));
+
+  if (dx !== 0 || dy !== 0) {
+    g.trail.push({ x: g.px, y: g.py, alpha: 0.5 });
+    if (g.trail.length > 14) g.trail.shift();
+  }
+  for (const t of g.trail) t.alpha -= 0.04;
+  g.trail = g.trail.filter(t => t.alpha > 0);
+}
+
+// ── UPDATE ────────────────────────────────────────────────────────────────────
+function update(dt) {
+  g.frame++;
+  updateMovement(dt);
+  if (g.waveState !== 'active') return;
+
+  g.essence += g.passiveDrain * dt;
+
+  // Player auto-fire
+  g.boltCooldown -= dt;
+  if (g.boltCooldown <= 0 && g.creatures.length > 0) {
+    g.boltCooldown = 1 / g.boltRate;
+    firePlayerBolts();
+  }
+
+  // Thralls orbit + fire
+  for (const th of g.thralls) {
+    th.fireCooldown -= dt;
+    if (th.fireCooldown <= 0 && g.creatures.length > 0) {
+      th.fireCooldown = 1 / (g.thrallFireRate * g.thrallAttackSpeed);
+      fireThrallBolt(th);
+    }
+    th.angle += dt * th.orbitSpeed;
+    th.x = g.px + Math.cos(th.angle) * th.orbitR;
+    th.y = g.py + Math.sin(th.angle) * th.orbitR;
+  }
+
+  // Creatures chase player — damage on contact (continuous)
+  for (const cr of g.creatures) {
+    const dx = g.px - cr.x, dy = g.py - cr.y;
+    const dist = Math.sqrt(dx*dx+dy*dy);
+    if (dist < 1) continue;
+    cr.x += (dx/dist) * cr.speed * dt;
+    cr.y += (dy/dist) * cr.speed * dt;
+
+    if (dist < 20 + cr.r) {
+      g.hp -= cr.damage * dt;
+      if (g.frame % 4 === 0) spawnParticles(g.px, g.py, '#7c3aed', 2);
+    }
+  }
+
+  // Move bolts + check hits
+  for (const b of g.bolts) {
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    b.age += dt;
+
+    for (const cr of g.creatures) {
+      const dx = b.x - cr.x, dy = b.y - cr.y;
+      if (Math.sqrt(dx*dx+dy*dy) < cr.r + 5) {
+        cr.hp -= b.dmg;
+        b.hit = true;
+        if (cr.hp <= 0) dominateCreature(cr);
+        break;
+      }
+    }
+  }
+
+  g.bolts     = g.bolts.filter(b => !b.hit && b.age < 1.5 && b.x > -50 && b.x < W+50 && b.y > -50 && b.y < H+50);
+  g.creatures = g.creatures.filter(c => c.hp > 0);
+
+  for (const p of g.particles) { p.x+=p.vx; p.y+=p.vy; p.vy+=0.1; p.alpha-=0.03; }
+  g.particles = g.particles.filter(p=>p.alpha>0);
+  for (const f of g.floaters) { f.y-=0.8; f.alpha-=0.022; }
+  g.floaters  = g.floaters.filter(f=>f.alpha>0);
+
+  if (g.creatures.length === 0 && g.creaturesLeft === 0) {
+    if (g.wave >= 10) { endGame(true); }
+    else { g.waveState = 'upgrading'; setTimeout(showUpgrades, 500); }
+  }
+
+  if (g.hp <= 0) { g.hp = 0; endGame(false); }
+
+  updateUI();
+}
+
+function dominateCreature(cr) {
+  g.totalDominated++;
+  g.essence += cr.essence;
+  addFloater(cr.x, cr.y-15, `+${cr.essence}`, '#22d3ee');
+  spawnParticles(cr.x, cr.y, '#a855f7', 14);
+  spawnParticles(cr.x, cr.y, '#22d3ee', 6);
+
+  const idx = g.thralls.length;
+  const orbitR = g.thrallOrbitR + Math.floor(idx/6)*38;
+  g.thralls.push({
+    x: cr.x, y: cr.y,
+    angle: Math.atan2(cr.y-g.py, cr.x-g.px),
+    orbitR,
+    orbitSpeed: 0.5 + Math.random()*0.5,
+    fireCooldown: Math.random(),
+    color: THRALL_COLORS[idx % THRALL_COLORS.length],
+    type: cr.type,
+    r: cr.r * 0.85,
+  });
+  updateThrallList();
+}
+
+function firePlayerBolts() {
+  const targets = nearestCreatures(g.px, g.py, g.boltRange, g.multibolt);
+  for (const target of targets) {
+    const dx = target.x - g.px, dy = target.y - g.py;
+    const dist = Math.sqrt(dx*dx+dy*dy);
+    g.bolts.push({ x:g.px, y:g.py, vx:(dx/dist)*g.boltSpeed, vy:(dy/dist)*g.boltSpeed, dmg:g.boltDmg, age:0, owner:'player' });
+  }
+}
+
+function fireThrallBolt(th) {
+  const targets = nearestCreatures(th.x, th.y, g.boltRange+50, 1);
+  for (const target of targets) {
+    const dx = target.x - th.x, dy = target.y - th.y;
+    const dist = Math.sqrt(dx*dx+dy*dy);
+    g.bolts.push({ x:th.x, y:th.y, vx:(dx/dist)*g.boltSpeed*0.85, vy:(dy/dist)*g.boltSpeed*0.85, dmg:Math.round(g.boltDmg*0.65), age:0, owner:'thrall', color:th.color });
+  }
+}
+
+function nearestCreatures(x, y, range, count) {
+  return g.creatures
+    .map(c => ({ c, d: Math.sqrt((c.x-x)**2+(c.y-y)**2) }))
+    .filter(o => o.d < range)
+    .sort((a,b) => a.d-b.d)
+    .slice(0, count)
+    .map(o => o.c);
+}
+
+function spawnParticles(x, y, color, count) {
+  for (let i=0; i<count; i++) {
+    const ang = Math.random()*Math.PI*2, spd = 1+Math.random()*4;
+    g.particles.push({ x, y, vx:Math.cos(ang)*spd, vy:Math.sin(ang)*spd-2, color, alpha:1, r:2+Math.random()*3 });
+  }
+}
+
+function addFloater(x, y, text, color) {
+  g.floaters.push({ x, y, text, color, alpha:1 });
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function render() {
+  ctx.clearRect(0,0,W,H);
+
+  // Dark dungeon floor
+  ctx.fillStyle = '#0a0a14';
+  ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle = '#111128';
+  ctx.lineWidth = 1;
+  for (let x=0; x<W; x+=30) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for (let y=0; y<H; y+=30) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+  // Player trail
+  for (const t of g.trail) {
+    ctx.globalAlpha = t.alpha * 0.6;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, 10, 0, Math.PI*2);
+    ctx.fillStyle = '#7c3aed';
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Psionic range ring
+  ctx.strokeStyle = 'rgba(168,85,247,0.07)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([5,5]);
+  ctx.beginPath();
+  ctx.arc(g.px, g.py, g.boltRange, 0, Math.PI*2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Thrall orbit rings + bodies
+  for (const th of g.thralls) {
+    ctx.strokeStyle = th.color + '1a';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3,4]);
+    ctx.beginPath();
+    ctx.arc(g.px, g.py, th.orbitR, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.shadowColor = th.color;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(th.x, th.y, th.r, 0, Math.PI*2);
+    ctx.fillStyle = th.color + '66';
+    ctx.fill();
+    ctx.strokeStyle = th.color;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.font = `${Math.round(th.r*1.6)}px serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('😵', th.x, th.y + th.r*0.42);
+  }
+
+  // Player — psionic aberrant orb
+  drawAberrant(g.px, g.py, 22, '#a855f7');
+
+  // Low sanity warning pulse
+  if (g.hp < g.maxHp * 0.3) {
+    const flash = Math.sin(g.frame * 0.18) * 0.5 + 0.5;
+    ctx.strokeStyle = `rgba(124,58,237,${flash*0.7})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(g.px, g.py, 34, 0, Math.PI*2);
+    ctx.stroke();
+  }
+
+  // Creatures
+  for (const cr of g.creatures) {
+    const hpPct = cr.hp / cr.maxHp;
+    // Shifts from creature color toward dominated purple
+    const dominated = 1 - hpPct;
+    const baseR = cr.type === 'troll' ? 34 : cr.type === 'beholder' ? 139 : 220;
+    const baseG = cr.type === 'troll' ? 197 : cr.type === 'beholder' ? 92  : 50;
+    const baseB = cr.type === 'troll' ? 94  : cr.type === 'beholder' ? 246 : 50;
+    const r = Math.round(baseR + (168 - baseR) * dominated);
+    const gv= Math.round(baseG + (85  - baseG) * dominated);
+    const b = Math.round(baseB + (247 - baseB) * dominated);
+
+    ctx.shadowColor = cr.type === 'beholder' ? '#8b5cf6' : cr.type === 'troll' ? '#22c55e' : '#ef4444';
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.arc(cr.x, cr.y, cr.r, 0, Math.PI*2);
+    ctx.fillStyle = `rgb(${r},${gv},${b})`;
+    ctx.fill();
+    ctx.strokeStyle = `rgb(${Math.round(r*0.7)},${Math.round(gv*0.7)},${Math.round(b*0.7)})`;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.font = `${Math.round(cr.r * 1.35)}px serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(hpPct > 0.45 ? cr.emoji : '😵‍💫', cr.x, cr.y + cr.r * 0.4);
+
+    // HP bar
+    ctx.fillStyle = '#1f2937';
+    ctx.fillRect(cr.x - cr.r, cr.y - cr.r - 7, cr.r*2, 4);
+    ctx.fillStyle = hpPct > 0.5 ? '#ef4444' : '#a855f7';
+    ctx.fillRect(cr.x - cr.r, cr.y - cr.r - 7, cr.r*2*hpPct, 4);
+  }
+
+  // Psionic bolts
+  for (const b of g.bolts) {
+    const color = b.owner === 'player' ? '#22d3ee' : (b.color || '#22d3ee');
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(Math.atan2(b.vy, b.vx));
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 7, 3, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
+  // Particles
+  for (const p of g.particles) {
+    ctx.globalAlpha = p.alpha;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+    ctx.fillStyle = p.color;
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Floaters
+  ctx.textAlign = 'center';
+  for (const f of g.floaters) {
+    ctx.globalAlpha = f.alpha;
+    ctx.font = 'bold 12px Arial';
+    ctx.fillStyle = f.color;
+    ctx.fillText(f.text, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
+
+  if (g.waveState === 'upgrading') {
+    ctx.fillStyle = 'rgba(10,10,20,0.78)';
+    ctx.fillRect(0,0,W,H);
+    ctx.font = 'bold 20px Arial';
+    ctx.fillStyle = '#a855f7';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#a855f7';
+    ctx.shadowBlur = 20;
+    ctx.fillText('PSIONIC SURGE', CX, CY);
+    ctx.shadowBlur = 0;
+    ctx.font = '12px Arial';
+    ctx.fillStyle = '#4b5563';
+    ctx.fillText('Choose your evolution...', CX, CY+26);
+  }
+}
+
+function drawAberrant(x, y, size, color) {
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 25;
+
+  // Animated tentacles
+  for (let i = 0; i < 6; i++) {
+    const baseAngle = (i / 6) * Math.PI * 2;
+    const wobble = Math.sin(g.frame * 0.04 + i * 1.1) * 0.35;
+    const angle = baseAngle + wobble;
+    const tx = x + Math.cos(angle) * size * 1.2;
+    const ty = y + Math.sin(angle) * size * 1.2;
+    const cx1 = x + Math.cos(angle + 0.9) * size * 0.65;
+    const cy1 = y + Math.sin(angle + 0.9) * size * 0.65;
+
+    ctx.strokeStyle = color + '66';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.quadraticCurveTo(cx1, cy1, tx, ty);
+    ctx.stroke();
+  }
+
+  // Core orb
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, size * 0.72, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Specular highlight
+  const grad = ctx.createRadialGradient(x - size*0.22, y - size*0.22, 0, x, y, size * 0.72);
+  grad.addColorStop(0, 'rgba(255,255,255,0.55)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(x, y, size * 0.72, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.shadowBlur = 0;
+}
+
+// ── UPGRADES ──────────────────────────────────────────────────────────────────
+function showUpgrades() {
+  const pool = [...UPGRADES].sort(() => Math.random()-0.5).slice(0,3);
+  const cards = document.getElementById('upgradeCards');
+  cards.innerHTML = '';
+  for (const up of pool) {
+    const el = document.createElement('div');
+    el.className = 'upgrade-card';
+    el.innerHTML = `<div class="u-icon">${up.icon}</div><div class="u-name">${up.name}</div><div class="u-desc">${up.desc}</div>`;
+    el.onclick = () => {
+      up.apply(g);
+      document.getElementById('upgradeOverlay').style.display = 'none';
+      g.wave++;
+      g.waveState = 'active';
+      g.creaturesLeft = 0;
+      spawnWave(g.wave);
+    };
+    cards.appendChild(el);
+  }
+  document.getElementById('upgradeOverlay').style.display = 'flex';
+}
+
+// ── GAME OVER ──────────────────────────────────────────────────────────────────
+function endGame(won) {
+  g.waveState = 'gameover';
+  const overlay = document.getElementById('gameoverOverlay');
+  document.getElementById('goTitle').textContent = won ? '🧠 Hive Ascendant!' : '💀 Mind Shattered';
+  document.getElementById('goResult').textContent = won
+    ? `You dominated all 10 waves with ${g.thralls.length} thralls bound.`
+    : `Your hold broke on wave ${g.wave} with ${g.totalDominated} dominated.`;
+  document.getElementById('goEssence').textContent = `${Math.round(g.essence).toLocaleString()} essence harvested`;
+  overlay.style.display = 'flex';
+}
+
+function restartGame() {
+  document.getElementById('gameoverOverlay').style.display = 'none';
+  document.getElementById('upgradeOverlay').style.display = 'none';
+  resetGame();
+}
+
+// ── UI ─────────────────────────────────────────────────────────────────────────
+function updateUI() {
+  document.getElementById('hpVal').textContent = Math.max(0, Math.round(g.hp));
+  document.getElementById('hpFill').style.width = Math.max(0, g.hp/g.maxHp*100) + '%';
+  document.getElementById('commVal').textContent = Math.round(g.essence).toLocaleString();
+  document.getElementById('thrallVal').textContent = g.thralls.length;
+  document.getElementById('dominatedVal').textContent = g.totalDominated;
+  if (g.creaturesLeft > 0 || g.creatures.length > 0) {
+    document.getElementById('waveLabel').textContent = `${g.creatures.length} remaining`;
+  }
+}
+
+function updateThrallList() {
+  const list = document.getElementById('thrallList');
+  list.innerHTML = `<div class="thrall-node"><div class="thrall-dot" style="background:#a855f7"></div><span>You (Aberrant)</span><span class="thrall-tag">+${g.thralls.length*10}% dmg</span></div>`;
+  const shown = g.thralls.slice(-8);
+  for (let i=0; i<shown.length; i++) {
+    const th = shown[i];
+    const label = CREATURES[th.type]?.label || 'Thrall';
+    const el = document.createElement('div');
+    el.className = 'thrall-node thrall-indent';
+    el.innerHTML = `<div class="thrall-dot" style="background:${th.color}"></div><span>${label}</span><span class="thrall-tag">${th.orbitR < 80 ? 'inner' : 'outer'}</span>`;
+    list.appendChild(el);
+  }
+  if (g.thralls.length > 8) {
+    const more = document.createElement('div');
+    more.style.cssText = 'font-size:9px;color:#374151;padding:4px 6px';
+    more.textContent = `+ ${g.thralls.length-8} more bound...`;
+    list.appendChild(more);
+  }
+}
+
+// ── LOOP ──────────────────────────────────────────────────────────────────────
+function loop(ts) {
+  const dt = Math.min((ts - g.lastTime)/1000, 0.05);
+  g.lastTime = ts;
+  update(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+
+resetGame();
+requestAnimationFrame(ts => { g.lastTime = ts; requestAnimationFrame(loop); });
+</script>
+</body>
+</html>
