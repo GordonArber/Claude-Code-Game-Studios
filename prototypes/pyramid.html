@@ -285,35 +285,38 @@ function resetGame() {
 }
 
 function spawnWave(wave) {
-  const count = 6 + wave * 3;
+  const count = 8 + wave * 4;
   g.prospectsLeft = count;
   document.getElementById('waveNum').textContent = wave;
   document.getElementById('waveLabel').textContent = `${count} prospects incoming`;
 
-  // Stagger spawns
+  // Stagger spawns — decrement prospectsLeft as each one arrives
   for (let i = 0; i < count; i++) {
     setTimeout(() => {
       if (g.waveState !== 'active') return;
       spawnProspect();
-    }, i * (Math.max(200, 900 - wave*60)));
+      g.prospectsLeft--;
+    }, i * (Math.max(120, 700 - wave*50)));
   }
 }
 
 function spawnProspect() {
   const angle = Math.random() * Math.PI * 2;
   const spawnR = 300;
-  const toughness = g.wave > 5 ? (Math.random() < 0.3 ? 'skeptic' : 'desperate') :
-                    (Math.random() < 0.15 ? 'skeptic' : 'desperate');
-  const hp = toughness === 'skeptic' ? 60 : 30;
+  const skepticChance = Math.min(0.5, 0.1 + g.wave * 0.05);
+  const toughness = Math.random() < skepticChance ? 'skeptic' : 'desperate';
+  const speedBoost = 1 + g.wave * 0.08;
+  const hp = toughness === 'skeptic' ? 70 : 35;
   g.prospects.push({
     x: CX + Math.cos(angle)*spawnR,
     y: CY + Math.sin(angle)*spawnR,
     hp, maxHp: hp,
-    speed: toughness === 'skeptic' ? 50 : 65,
+    speed: (toughness === 'skeptic' ? 75 : 95) * speedBoost,
+    damage: 8 + g.wave * 2,
     type: toughness,
     r: toughness === 'skeptic' ? 14 : 11,
     id: Math.random(),
-    pitchCooldown: Math.random()*2, // per-recruit cooldown
+    pitchCooldown: Math.random()*2,
   });
 }
 
@@ -378,10 +381,10 @@ function update(dt) {
 
     // Hit player
     if (dist < 20 + pr.r) {
-      g.hp -= 10;
+      g.hp -= pr.damage;
       pr.hp = -1;
       spawnParticles(g.px, g.py, '#cc4444', 8);
-      addFloater(g.px, g.py-20, '-10 HP', '#cc4444');
+      addFloater(g.px, g.py-20, `-${pr.damage} HP`, '#cc4444');
     }
   }
 
