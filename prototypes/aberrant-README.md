@@ -2,7 +2,7 @@
 
 **Status:** In Progress  
 **File:** `prototypes/aberrant.html` (single-file, open in any browser)  
-**Last updated:** 2026-05-10
+**Last updated:** 2026-05-10 — formation rework + late-game rebalance
 
 ---
 
@@ -67,19 +67,31 @@ Three creature types, each with unique stats:
 - Spawn interval: `max(35, 550 - wave × 55)` ms
 
 ### Thralls
-- Dominated creatures orbit the player, auto-firing bolts
-- Orbit system uses **expanding rings**: first 6 thralls form ring 0, next 6 ring 1, etc.
-- **Dynamic orbit scaling**: all ring radii expand together as new rings are added
-  (`scale = 1 + (totalRings - 1) × 0.45`) so the formation grows outward organically
-- Thrall bolt damage: 38% of player bolt damage (weaker but compound)
-- Thrall fire rate: 0.5/sec base
-- Thralls have their own HP (3× creature base HP, scaled to wave)
-- Thralls can die if enemies intercept them; dead thralls "break free" with particle effect
+- Dominated creatures join an orbiting horde that auto-fires bolts.
+- **Cap:** `THRALL_CAP = 60`. Kills beyond the cap award **2× essence** instead of
+  adding a thrall — late-game power is bounded.
+- **Ring formation:** 12 thralls per ring, ring gap `0.06 × min(W,H)`, inner ring
+  radius `0.1 × min(W,H)`. With cap 60, the formation fills exactly 5 rings.
+- **Newest fills innermost slot.** When the inner ring is full, the next dominate
+  pushes the prior cohort outward to the next ring (and so on). On death,
+  survivors glide inward — the formation behaves like rippling rings, not a
+  stacked snap.
+- **Per-ring rotation:** each ring has its own continuous phase. Base speed
+  `0.06 rad/s` with shallow decay, alternating direction by ring index. Inner
+  ring drifts ~3°/s; outer rings nearly still.
+- **Smooth transit:** each thrall's actual `orbitR` lerps to its target with
+  exponential decay (rate 3.5/s); its slot-angle lerps at rate 5/s. New thralls
+  fly in from the creature's death position rather than teleporting to formation.
+- **Stats:** HP = `creatureBaseHp × 0.75 × 1.10^(wave-1)`; bolt damage =
+  `playerBoltDmg × 0.26`; fire rate `0.32/s` base (cooldown ~3.1s).
+- Dead thralls show a **BROKEN FREE** floater + red/purple particle burst.
 
 ### Enemy AI
-- All enemies chase the player by default
-- If an enemy is within `playerDist × 0.4` of a thrall, it redirects to attack that thrall
-- This creates natural thrall attrition — larger armies draw some fire
+- All enemies chase the player by default.
+- Redirect threshold tightened to `playerDist × 0.2` — thralls only intercept when
+  essentially adjacent. Most charges punch through the ring to hit the player.
+- Thrall attrition still happens organically when a creature collides with the
+  nearest thrall on its path to the player.
 
 ### Camera
 - Vampire Survivors-style: player is always screen-center, world scrolls around them
@@ -91,8 +103,10 @@ Three creature types, each with unique stats:
 - Essence + thrall count (top right)
 - Sanity bar with color coding: purple → amber → red (bottom)
 - Thrall panel (right side): shows dominated creatures with type, HP bar, wave captured
-- **Offscreen battle arrows**: flashing red triangles at screen edges pointing toward
-  any thrall currently being attacked outside the visible viewport
+- **Offscreen battle arrows**: triangles at screen edges pointing toward any
+  offscreen thrall in combat. Amber when an enemy is within ~110 units of the
+  thrall (proximity), brighter red flash when the thrall is actively taking
+  damage. (Previously only triggered on direct hits, which almost never fired.)
 
 ### Upgrades (shown between waves, 3 random choices)
 | ID | Name | Effect |
@@ -134,23 +148,44 @@ Three creature types, each with unique stats:
 | Orbit looked like "planets on dotted lines" | Removed orbit path rendering |
 | Thralls capped too early | Removed cap entirely, camera follow solved the real problem |
 | Split Consciousness stackable | Marked `unique: true`, gated Psionic Pierce behind it |
+| Battle arrows almost never appeared | Broadened trigger from "under direct attack" to "any enemy within ~110 units"; tiered visual (amber proximity, red flash on hit) |
+| Orbit rings snapped outward when a new ring formed | Removed global scale factor; per-ring radius is fixed |
+| Ring rotation felt chaotic / too fast | Per-ring shared rotation (alternating direction), base speed dropped 0.55 → 0.06 rad/s |
+| New thralls popped into formation, deaths snapped survivors | All transitions lerp (exp decay); new thralls fly in from death position; ring changes preserve visual angle (no snap) |
+| Newest thralls ended up in outer rings, oldest closest — backwards | Reverse-indexed: newest fills innermost slot 0; cohorts shift outward as the inner ring fills |
+| Late game trivially won — never got charged | Cap of 60 thralls + 2× essence past cap; thrall HP cut ~80%; thrall DPS roughly halved (fire rate 0.50 → 0.32, bolt damage 0.38 → 0.26 of player); redirect threshold 0.4 → 0.2 lets creatures reach the player |
 
 ---
 
 ## Open Questions / Next Experiments
 
-- Does the orbit expansion feel rewarding enough visually as the army grows?
+- Does the rippling ring expansion read clearly as "growth" to a first-time player?
 - Should essence have a spend mechanic (active abilities) or remain passive score?
 - Is wave 10 an appropriate length for a commercial loop, or should it be endless?
-- Potential new enemy type: ranged attacker that stays outside thrall orbit radius
+- Potential new enemy type: ranged attacker that stays outside thrall orbit radius.
+- Once the cap is hit, the upgrade choices ("Hive Resonance", "Thrall Frenzy") still
+  matter for DPS — but is "Eldritch Carapace" / sanity upgrades better tuned now?
+- Should the inner ring slots be a "promoted" tier (newest in, but oldest elsewhere
+  gets buffed)? Currently being old is purely worse — older thralls take less inner
+  shielding and have the same stats.
 
 ---
 
 ## Findings (Updated as prototype evolves)
 
-- The domination fantasy works — converting enemies feels meaningfully different from killing them
-- Thrall attrition (enemies retargeting thralls) adds tension without explicit capping
-- VS-style camera is non-negotiable for this design; screen-clamp felt claustrophobic
-- Bullet density matters as much as damage numbers — felt much better after bolt rate increase
-- Dynamic orbit rings need further playtesting: formation growth is satisfying but radius pop
-  on domination may be jarring at high thrall counts
+- The domination fantasy works — converting enemies feels meaningfully different from killing them.
+- Thrall attrition (enemies retargeting thralls) adds tension without explicit capping.
+- VS-style camera is non-negotiable for this design; screen-clamp felt claustrophobic.
+- Bullet density matters as much as damage numbers — felt much better after bolt rate increase.
+- **Unbounded thrall growth breaks late-game tension.** Without a cap, the ring becomes a
+  fortress that kills everything before it can close on the player. `THRALL_CAP = 60` plus
+  a 2× essence bonus past the cap preserves the power fantasy without trivialising the loop.
+- **Ring formation needs to feel alive, not snappy.** Reverse-indexed slots (newest inner),
+  exponential lerps on radius/angle, and per-ring shared rotation produced the desired
+  "rippling rings" growth pattern. Independent per-thrall random orbit speeds looked chaotic
+  by comparison.
+- **Combat indicators have to fire often.** The original "under attack" trigger was so
+  narrow it almost never appeared. Proximity-based triggers (amber) plus damage flashes
+  (red) feel reliably informative.
+- **Thrall HP and firepower compound.** Halving both at once (HP × ~0.4 vs original; DPS × ~0.5)
+  was needed to bring the late game back into pressure range. Either change alone wasn't enough.

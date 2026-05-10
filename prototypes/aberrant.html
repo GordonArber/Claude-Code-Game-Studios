@@ -214,7 +214,7 @@ function resetGame() {
     boltPierce: false,
     multibolt: 1,
     boltCooldown: 0,
-    thrallFireRate: 0.50,
+    thrallFireRate: 0.32,
     thrallAttackSpeed: 1,
     acquiredUpgrades: new Set(),
     wave: 1,
@@ -228,6 +228,7 @@ function resetGame() {
     floaters: [],
     trail: [],
     thrallOrbitBase: Math.min(W, H) * 0.1,
+    ringPhase: [],
     frame: 0,
     lastTime: 0,
   };
@@ -307,20 +308,34 @@ function update(dt) {
     firePlayerBolts();
   }
 
-  // Thralls orbit + fire
+  // Advance per-ring rotation phase (alternating direction, slower for outer rings)
+  for (let r = 0; r < g.ringPhase.length; r++) {
+    const dir = (r % 2 === 0 ? 1 : -1);
+    const speed = Math.max(0.02, 0.06 - r * 0.012);
+    g.ringPhase[r] += dir * speed * dt;
+  }
+
+  // Thralls fire + smoothly lerp toward formation slot
+  const radiusRate = 1 - Math.exp(-3.5 * dt);
+  const angleRate  = 1 - Math.exp(-5.0 * dt);
   for (const th of g.thralls) {
     th.fireCooldown -= dt;
     if (th.fireCooldown <= 0 && g.creatures.length > 0) {
       th.fireCooldown = 1 / (g.thrallFireRate * g.thrallAttackSpeed);
       fireThrallBolt(th);
     }
-    th.angle += dt * th.orbitSpeed;
+    th.orbitR += (th.targetOrbitR - th.orbitR) * radiusRate;
+    let diff = th.slotOffsetTarget - th.slotOffsetCurrent;
+    while (diff >  Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    th.slotOffsetCurrent += diff * angleRate;
+    th.angle = g.ringPhase[th.ring] + th.slotOffsetCurrent;
     th.x = g.px + Math.cos(th.angle) * th.orbitR;
     th.y = g.py + Math.sin(th.angle) * th.orbitR;
   }
 
-  // Reset per-frame attack flags
-  for (const th of g.thralls) th.underAttack = false;
+  // Reset per-frame combat flags
+  for (const th of g.thralls) { th.underAttack = false; th.inCombat = false; }
 
   // Creatures chase player; outer-ring thralls intercept ones that get very close
   for (const cr of g.creatures) {
@@ -333,8 +348,8 @@ function update(dt) {
         if (d < nearestD) { nearestD = d; targetThrall = th; }
       }
       const playerDist = Math.hypot(cr.x - g.px, cr.y - g.py);
-      // Only redirect if thrall is far closer (rare true interception)
-      if (nearestD < playerDist * 0.4) {
+      // Only redirect if thrall is essentially in the way — most charges punch through
+      if (nearestD < playerDist * 0.2) {
         tx = targetThrall.x; ty = targetThrall.y;
       } else {
         targetThrall = null;
@@ -352,11 +367,18 @@ function update(dt) {
       if (targetThrall) {
         targetThrall.hp -= cr.damage * dt;
         targetThrall.underAttack = true;
+        targetThrall.inCombat = true;
         if (g.frame % 3 === 0) spawnParticles(targetThrall.x, targetThrall.y, '#ef4444', 2);
       } else {
         g.hp -= cr.damage * dt;
         if (g.frame % 5 === 0) spawnParticles(g.px, g.py, '#7c3aed', 2);
       }
+    }
+
+    // Proximity-based combat flag — any nearby creature counts as "in combat"
+    for (const th of g.thralls) {
+      if (th.inCombat) continue;
+      if (Math.hypot(cr.x - th.x, cr.y - th.y) < th.r + 110) th.inCombat = true;
     }
   }
 
@@ -404,36 +426,75 @@ function update(dt) {
 }
 
 function recalcThrallOrbits() {
-  const totalRings = Math.max(1, Math.ceil(g.thralls.length / 6));
-  const scale = 1 + (totalRings - 1) * 0.45;
-  for (let i = 0; i < g.thralls.length; i++) {
-    const ring = Math.floor(i / 6);
-    g.thralls[i].orbitR = (g.thrallOrbitBase + ring * Math.min(W, H) * 0.075) * scale;
+  // Newest thrall fills innermost ring; older thralls get pushed outward.
+  // When inner ring fills, the next add lands in inner slot 0 and the
+  // previously-inner cohort shifts out to the next ring. Targets only —
+  // actual orbitR/slotOffsetCurrent lerp toward these in the update loop.
+  const perRing = 12;
+  const ringGap = Math.min(W, H) * 0.06;
+  const total = g.thralls.length;
+  const numRings = Math.max(1, Math.ceil(total / perRing));
+  while (g.ringPhase.length < numRings) g.ringPhase.push(0);
+
+  for (let i = 0; i < total; i++) {
+    const th = g.thralls[i];
+    const fromEnd = total - 1 - i;       // 0 = newest
+    const ring = Math.floor(fromEnd / perRing);
+    const slot = fromEnd % perRing;
+    const isOutermost = ring === numRings - 1;
+    const ringSize = isOutermost ? (total - ring * perRing) : perRing;
+
+    // If a thrall changes ring, preserve its visual angle by re-basing
+    // slotOffsetCurrent against the new ring's phase. Avoids snap.
+    if (th.ring !== undefined && th.ring !== ring && th.slotOffsetCurrent !== undefined) {
+      const visualAngle = (g.ringPhase[th.ring] || 0) + th.slotOffsetCurrent;
+      th.slotOffsetCurrent = visualAngle - (g.ringPhase[ring] || 0);
+    }
+    th.ring = ring;
+    th.targetOrbitR = g.thrallOrbitBase + ring * ringGap;
+    th.slotOffsetTarget = (slot / ringSize) * Math.PI * 2;
   }
 }
 
+const THRALL_CAP = 60;
+
 function dominateCreature(cr) {
   g.totalDominated++;
+
+  // Hard cap on the thrall horde — extra kills yield bonus essence instead.
+  if (g.thralls.length >= THRALL_CAP) {
+    const bonus = cr.essence * 2;
+    g.essence += bonus;
+    addFloater(cr.x, cr.y - 18, `+${bonus} essence`, '#22d3ee');
+    spawnParticles(cr.x, cr.y, '#22d3ee', 12);
+    return;
+  }
+
   g.essence += cr.essence;
   addFloater(cr.x, cr.y - 18, `+${cr.essence}`, '#22d3ee');
   spawnParticles(cr.x, cr.y, '#a855f7', 14);
   spawnParticles(cr.x, cr.y, '#22d3ee', 5);
 
   const idx = g.thralls.length;
+  const startDist  = Math.hypot(cr.x - g.px, cr.y - g.py);
+  const startAngle = Math.atan2(cr.y - g.py, cr.x - g.px);
   g.thralls.push({
     x: cr.x, y: cr.y,
-    angle: Math.atan2(cr.y - g.py, cr.x - g.px),
-    orbitR: g.thrallOrbitBase,
-    orbitSpeed: 0.45 + Math.random() * 0.55,
+    angle: startAngle,
+    orbitR: startDist,
     fireCooldown: Math.random(),
     color: THRALL_COLORS[idx % THRALL_COLORS.length],
     type: cr.type, r: cr.r * 0.85, emoji: cr.emoji,
     wave: g.wave,
     id: Math.random(),
-    hp: Math.round(CREATURES[cr.type].baseHp * 3.0 * Math.pow(1.2, g.wave - 1)),
-    maxHp: Math.round(CREATURES[cr.type].baseHp * 3.0 * Math.pow(1.2, g.wave - 1)),
+    hp: Math.round(CREATURES[cr.type].baseHp * 0.75 * Math.pow(1.10, g.wave - 1)),
+    maxHp: Math.round(CREATURES[cr.type].baseHp * 0.75 * Math.pow(1.10, g.wave - 1)),
   });
   recalcThrallOrbits();
+  // Seed the new thrall's slotOffsetCurrent so visual angle equals startAngle;
+  // it then lerps from death point into its formation slot.
+  const nth = g.thralls[g.thralls.length - 1];
+  nth.slotOffsetCurrent = startAngle - (g.ringPhase[nth.ring] || 0);
   updateThrallPanel();
 }
 
@@ -449,7 +510,7 @@ function fireThrallBolt(th) {
   const targets = nearestCreatures(th.x, th.y, g.boltRange * 1.15, 1);
   for (const t of targets) {
     const dx = t.x - th.x, dy = t.y - th.y, dist = Math.hypot(dx, dy);
-    g.bolts.push({ x: th.x, y: th.y, vx: (dx/dist)*g.boltSpeed*0.82, vy: (dy/dist)*g.boltSpeed*0.82, dmg: Math.round(g.boltDmg * 0.38), age: 0, owner: 'thrall', color: th.color, hitIds: g.boltPierce ? new Set() : null });
+    g.bolts.push({ x: th.x, y: th.y, vx: (dx/dist)*g.boltSpeed*0.82, vy: (dy/dist)*g.boltSpeed*0.82, dmg: Math.round(g.boltDmg * 0.26), age: 0, owner: 'thrall', color: th.color, hitIds: g.boltPierce ? new Set() : null });
   }
 }
 
@@ -659,12 +720,13 @@ function drawHUD() {
     ctx.shadowBlur = 0;
   }
 
-  // Offscreen battle arrows — flash when a thrall is under attack outside viewport
+  // Offscreen battle arrows — flash toward any offscreen thrall engaged in combat.
+  // Brighter red when actively taking damage, softer amber when just near enemies.
   const camX = W / 2 - g.px, camY = H / 2 - g.py;
   const arrowMargin = 36;
   const flashOn = Math.sin(g.frame * 0.25) > 0;
   for (const th of g.thralls) {
-    if (!th.underAttack) continue;
+    if (!th.inCombat) continue;
     const sx = th.x + camX, sy = th.y + camY;
     if (sx >= arrowMargin && sx <= W - arrowMargin && sy >= arrowMargin && sy <= H - arrowMargin) continue;
     const dx = sx - CX, dy = sy - CY;
@@ -674,12 +736,14 @@ function drawHUD() {
     const t = ac < 0.001 ? hh / as : as < 0.001 ? hw / ac : Math.min(hw / ac, hh / as);
     const edgeX = CX + Math.cos(angle) * t;
     const edgeY = CY + Math.sin(angle) * t;
+    const urgent = th.underAttack;
+    const color  = urgent ? '#ef4444' : '#f59e0b';
     ctx.save();
     ctx.translate(edgeX, edgeY);
     ctx.rotate(angle);
-    ctx.globalAlpha = flashOn ? 1 : 0.35;
-    ctx.fillStyle = '#ef4444';
-    ctx.shadowColor = '#ef4444'; ctx.shadowBlur = flashOn ? 14 : 0;
+    ctx.globalAlpha = urgent ? (flashOn ? 1 : 0.4) : 0.7;
+    ctx.fillStyle = color;
+    ctx.shadowColor = color; ctx.shadowBlur = urgent && flashOn ? 14 : 6;
     ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(-7, 8); ctx.lineTo(-7, -8); ctx.closePath(); ctx.fill();
     ctx.restore();
   }
