@@ -269,7 +269,7 @@ function spawnCreature(wave) {
   const dmg = def.baseDmg + (wave - 1) * 5;
   const ess = def.essence + wave * 25;
 
-  g.creatures.push({ x: sx, y: sy, hp, maxHp: hp, speed: def.baseSpd * speedBoost, damage: dmg, essence: ess, type, r: def.r, emoji: def.emoji, id: Math.random(), targetThrallId: null, retargetCooldown: Math.random() * 2 });
+  g.creatures.push({ x: sx, y: sy, hp, maxHp: hp, speed: def.baseSpd * speedBoost, damage: dmg, essence: ess, type, r: def.r, emoji: def.emoji, id: Math.random() });
 }
 
 // ── MOVEMENT ──────────────────────────────────────────────────────────────────
@@ -318,25 +318,24 @@ function update(dt) {
     th.y = g.py + Math.sin(th.angle) * th.orbitR;
   }
 
-  // Creatures chase target — player, or a thrall from wave 4+
+  // Creatures target nearest entity — thralls act as a natural shield ring
   for (const cr of g.creatures) {
-    // Periodically re-evaluate target
-    cr.retargetCooldown -= dt;
-    if (cr.retargetCooldown <= 0) {
-      cr.retargetCooldown = 2.5 + Math.random() * 2;
-      if (g.wave >= 4 && g.thralls.length > 0 && Math.random() < 0.55) {
-        cr.targetThrallId = g.thralls[Math.floor(Math.random() * g.thralls.length)].id;
-      } else {
-        cr.targetThrallId = null;
-      }
-    }
-
-    // Resolve target
     let tx = g.px, ty = g.py, targetThrall = null;
-    if (cr.targetThrallId !== null) {
-      targetThrall = g.thralls.find(th => th.id === cr.targetThrallId);
-      if (!targetThrall) cr.targetThrallId = null; // target died, fall back to player
-      else { tx = targetThrall.x; ty = targetThrall.y; }
+
+    if (g.thralls.length > 0) {
+      // Find nearest thrall
+      let nearestD = Infinity;
+      for (const th of g.thralls) {
+        const d = Math.hypot(cr.x - th.x, cr.y - th.y);
+        if (d < nearestD) { nearestD = d; targetThrall = th; }
+      }
+      const playerDist = Math.hypot(cr.x - g.px, cr.y - g.py);
+      // Chase thrall only if it's closer than the player
+      if (nearestD < playerDist) {
+        tx = targetThrall.x; ty = targetThrall.y;
+      } else {
+        targetThrall = null;
+      }
     }
 
     const dx = tx - cr.x, dy = ty - cr.y;
@@ -345,11 +344,11 @@ function update(dt) {
     cr.x += (dx / dist) * cr.speed * dt;
     cr.y += (dy / dist) * cr.speed * dt;
 
-    // Contact damage
+    // Contact damage to target
     if (dist < (targetThrall ? 16 : 22) + cr.r) {
       if (targetThrall) {
         targetThrall.hp -= cr.damage * dt;
-        if (g.frame % 4 === 0) spawnParticles(targetThrall.x, targetThrall.y, '#ef4444', 2);
+        if (g.frame % 3 === 0) spawnParticles(targetThrall.x, targetThrall.y, '#ef4444', 2);
       } else {
         g.hp -= cr.damage * dt;
         if (g.frame % 5 === 0) spawnParticles(g.px, g.py, '#7c3aed', 2);
