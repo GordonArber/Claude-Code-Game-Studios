@@ -2,531 +2,531 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>NUDGE — Prototype</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>NUDGE</title>
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
-body {
-  background: #0a0a16;
-  color: #e0e0f0;
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
-  user-select: none;
-}
-
-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 20px;
-  background: #10102a;
-  border-bottom: 1px solid #252550;
-  flex-shrink: 0;
+:root {
+  --bg: #09090f;
+  --surface: #10102a;
+  --border: #1e1e3c;
+  --text: #ddddf5;
+  --muted: #6060a0;
+  --accent: #8070ff;
+  --accent-dim: #8070ff22;
 }
 
-header h1 {
-  font-size: 16px;
-  font-weight: 800;
-  letter-spacing: 5px;
-  color: #9080ff;
-}
-
-.speed-controls { display: flex; gap: 5px; }
-.speed-btn {
-  background: #1a1a38;
-  border: 1px solid #252550;
-  border-radius: 4px;
-  color: #7070aa;
-  font-size: 11px;
-  padding: 3px 10px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.speed-btn:hover { background: #22224a; color: #a0a0dd; }
-.speed-btn.active { background: #28285a; border-color: #7060ff; color: #a090ff; }
-
-.main {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-}
-
-/* LEFT PANEL */
-.left-panel {
-  width: 185px;
-  background: #10102a;
-  border-right: 1px solid #252550;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  flex-shrink: 0;
-}
-
-.panel-section {
-  padding: 12px 14px;
-  border-bottom: 1px solid #1a1a38;
-}
-
-.panel-section h3 {
-  font-size: 9px;
-  letter-spacing: 2.5px;
-  text-transform: uppercase;
-  color: #50508a;
-  margin-bottom: 10px;
-}
-
-.faction-row {
-  margin-bottom: 9px;
-}
-.faction-header {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-bottom: 3px;
-}
-.faction-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.faction-name {
-  font-size: 10px;
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: #c0c0e0;
-}
-.faction-pct {
-  font-size: 10px;
-  color: #7070aa;
-  font-variant-numeric: tabular-nums;
-  min-width: 28px;
-  text-align: right;
-}
-.faction-bar {
-  height: 3px;
-  background: #1a1a38;
-  border-radius: 2px;
-  overflow: hidden;
-}
-.faction-bar-fill {
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   height: 100%;
-  border-radius: 2px;
-  transition: width 0.8s ease;
+  overflow: hidden;
+  touch-action: manipulation;
 }
 
-.legend-item {
-  font-size: 10px;
-  color: #50508a;
-  line-height: 2;
-}
-
-/* MAP */
-.map-area {
-  flex: 1;
+/* ── Phone shell (desktop preview) ─────────────────────── */
+.shell {
+  width: 390px;
+  height: 844px;
+  margin: 0 auto;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #07070f;
+  flex-direction: column;
+  background: var(--bg);
   position: relative;
   overflow: hidden;
 }
 
-#mapCanvas {
-  cursor: crosshair;
-  display: block;
-  image-rendering: pixelated;
+/* On a real phone, fill the viewport */
+@media (max-width: 430px) {
+  .shell {
+    width: 100vw;
+    height: 100dvh;
+  }
 }
 
-.tooltip {
-  position: absolute;
-  background: #13133a;
-  border: 1px solid #353580;
-  border-radius: 6px;
-  padding: 7px 11px;
-  font-size: 11px;
-  pointer-events: none;
-  z-index: 10;
-  line-height: 1.7;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-}
-
-/* RIGHT PANEL */
-.right-panel {
-  width: 210px;
-  background: #10102a;
-  border-left: 1px solid #252550;
+/* ── Status bar mock ───────────────────────────────────── */
+.status-bar {
   display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px 4px;
+  font-size: 11px;
+  color: var(--muted);
   flex-shrink: 0;
 }
 
-.tap-section { padding: 14px; border-bottom: 1px solid #1a1a38; }
-.tap-section h3 {
+/* ── App header ────────────────────────────────────────── */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 18px 10px;
+  flex-shrink: 0;
+}
+
+.app-title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 5px;
+  color: var(--accent);
+}
+
+.day-chip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.day-chip strong { color: var(--text); font-size: 14px; }
+
+.speed-btn-mini {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+/* ── Map ────────────────────────────────────────────────── */
+.map-wrap {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  position: relative;
+}
+
+#mapCanvas {
+  display: block;
+  image-rendering: pixelated;
+  touch-action: none;
+}
+
+/* Tap ripple overlay */
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.6);
+  pointer-events: none;
+  animation: ripple-out 0.6s ease-out forwards;
+}
+@keyframes ripple-out {
+  from { transform: scale(0); opacity: 1; }
+  to   { transform: scale(4); opacity: 0; }
+}
+
+/* ── Faction strip ──────────────────────────────────────── */
+.faction-strip {
+  display: flex;
+  gap: 6px;
+  padding: 8px 14px;
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.faction-strip::-webkit-scrollbar { display: none; }
+
+.faction-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: border-color 0.3s;
+}
+.faction-chip.leading { border-color: #ffffff30; }
+.f-dot { width: 7px; height: 7px; border-radius: 50%; }
+.f-name { font-size: 10px; color: var(--muted); }
+.f-pct { font-size: 11px; font-weight: 600; }
+
+/* ── Events feed ────────────────────────────────────────── */
+.events-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  scrollbar-width: none;
+}
+.events-scroll::-webkit-scrollbar { display: none; }
+
+.event-pill {
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+  border-left: 3px solid var(--border);
+  flex-shrink: 0;
+}
+.event-pill.player {
+  border-left-color: var(--accent);
+  color: #b0a8ff;
+  background: var(--accent-dim);
+}
+.event-pill .eday {
   font-size: 9px;
-  letter-spacing: 2.5px;
+  letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: #50508a;
+  color: #35356a;
+  display: block;
+  margin-bottom: 2px;
+}
+
+/* ── Action bar (bottom) ────────────────────────────────── */
+.action-bar {
+  flex-shrink: 0;
+  padding: 10px 14px 0;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+/* Tap ready / timer pill */
+.tap-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 10px;
 }
 
-.tap-badge {
-  background: linear-gradient(135deg, #1e1e4a, #252560);
-  border: 1px solid #4040a0;
-  border-radius: 10px;
-  padding: 10px 14px;
-  text-align: center;
-  margin-bottom: 12px;
+.tap-pill {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 30px;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
 }
-.tap-badge.ready {
-  border-color: #7060ff;
-  box-shadow: 0 0 20px #7060ff22;
+.tap-pill.ready {
+  border-color: var(--accent);
+  box-shadow: 0 0 18px var(--accent-dim);
 }
-.tap-badge.used {
-  background: #121228;
-  border-color: #252540;
-  box-shadow: none;
-}
+.tap-pill-label { font-size: 11px; color: var(--muted); }
+.tap-pill-value { font-size: 14px; font-weight: 700; color: var(--accent); }
+.tap-pill-value.waiting { font-size: 12px; color: var(--muted); font-weight: 400; }
 
-.tap-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: #50508a; margin-bottom: 4px; }
-.tap-value { font-size: 20px; font-weight: 700; color: #9080ff; }
-.tap-value.used { font-size: 12px; color: #50508a; font-weight: 400; }
-
-.timer-bar { height: 3px; background: #1a1a38; border-radius: 2px; margin-top: 8px; overflow: hidden; }
-.timer-fill {
+.tap-timer-track {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--border);
+}
+.tap-timer-fill {
   height: 100%;
-  background: linear-gradient(90deg, #5040cc, #9080ff);
-  border-radius: 2px;
+  background: linear-gradient(90deg, #5040cc, var(--accent));
   transition: width 0.5s linear;
 }
 
-.action-desc {
-  font-size: 10px;
-  color: #6060a0;
-  margin-bottom: 10px;
-  line-height: 1.6;
-  min-height: 32px;
+/* Action buttons row */
+.action-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
-.actions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.action-btn {
-  background: #1a1a38;
-  border: 1px solid #252550;
-  border-radius: 8px;
-  padding: 9px 6px;
+.act-btn {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 4px 8px;
   text-align: center;
   cursor: pointer;
   transition: all 0.15s;
+  -webkit-user-select: none;
 }
-.action-btn:hover { background: #20203e; border-color: #404080; }
-.action-btn.selected {
-  background: #22225a;
-  border-color: #7060ff;
-  box-shadow: 0 0 12px #7060ff30;
+.act-btn:active { transform: scale(0.93); }
+.act-btn.selected {
+  background: #1e1e50;
+  border-color: var(--accent);
+  box-shadow: 0 0 14px var(--accent-dim);
 }
-.action-icon { font-size: 18px; display: block; margin-bottom: 3px; }
-.action-name { font-size: 9px; color: #7070aa; display: block; letter-spacing: 1px; }
+.act-icon { font-size: 22px; display: block; margin-bottom: 3px; }
+.act-name { font-size: 9px; letter-spacing: 1px; color: var(--muted); display: block; text-transform: uppercase; }
 
-.events-section {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  padding: 12px 14px;
+.act-desc {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  padding: 0 4px 10px;
+  line-height: 1.5;
+  min-height: 34px;
 }
-.events-section h3 {
-  font-size: 9px;
-  letter-spacing: 2.5px;
-  text-transform: uppercase;
-  color: #50508a;
-  margin-bottom: 10px;
+
+/* Safe area bottom */
+.safe-bottom { height: env(safe-area-inset-bottom, 8px); flex-shrink: 0; }
+
+/* Desktop hint */
+.desktop-hint {
+  text-align: center;
+  padding: 8px;
+  font-size: 11px;
+  color: #30305a;
   flex-shrink: 0;
 }
-.events-list {
-  flex: 1;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.events-list::-webkit-scrollbar { width: 3px; }
-.events-list::-webkit-scrollbar-thumb { background: #252550; border-radius: 2px; }
-
-.event-item {
-  font-size: 10px;
-  line-height: 1.5;
-  color: #7070a0;
-  padding: 6px 8px;
-  background: #0d0d20;
-  border-radius: 5px;
-  border-left: 2px solid #252550;
-}
-.event-item.player { border-left-color: #7060ff; color: #a898ff; }
-.event-day { color: #35355a; font-size: 9px; display: block; margin-bottom: 1px; letter-spacing: 1px; }
-
-.no-tap-msg {
-  font-size: 10px;
-  color: #40406a;
-  text-align: center;
-  padding: 6px;
-  font-style: italic;
-}
+@media (max-width: 430px) { .desktop-hint { display: none; } }
 </style>
 </head>
 <body>
 
-<header>
-  <h1>NUDGE</h1>
-  <div style="display:flex;gap:20px;align-items:center">
-    <div style="font-size:12px;color:#50508a">Day <strong id="dayNum" style="color:#c0c0e0;font-size:14px">1</strong></div>
-    <div class="speed-controls">
-      <button class="speed-btn active" onclick="setSpeed(1)" id="sp1">1×</button>
-      <button class="speed-btn" onclick="setSpeed(3)" id="sp3">3×</button>
-      <button class="speed-btn" onclick="setSpeed(10)" id="sp10">10×</button>
-    </div>
+<div class="shell">
+
+  <!-- Status bar -->
+  <div class="status-bar">
+    <span id="clockDisplay">9:41</span>
+    <span>●●●</span>
   </div>
-  <div style="font-size:11px;color:#35355a;letter-spacing:1px">ONE ACTION · INFINITE CONSEQUENCE</div>
-</header>
 
-<div class="main">
-
-  <div class="left-panel">
-    <div class="panel-section">
-      <h3>Factions</h3>
-      <div id="factionList"></div>
-    </div>
-    <div class="panel-section">
-      <h3>Legend</h3>
-      <div class="legend-item">Brighter cell = stronger hold</div>
-      <div class="legend-item">◆ Yellow dot = resource node</div>
-      <div class="legend-item">Dark region = neutral land</div>
+  <!-- App header -->
+  <div class="app-header">
+    <div class="app-title">NUDGE</div>
+    <div style="display:flex;gap:8px">
+      <div class="speed-btn-mini" id="speedToggle" onclick="cycleSpeed()">1×</div>
+      <div class="day-chip">Day <strong id="dayNum">1</strong></div>
     </div>
   </div>
 
-  <div class="map-area">
+  <!-- Map -->
+  <div class="map-wrap" id="mapWrap">
     <canvas id="mapCanvas"></canvas>
-    <div class="tooltip" id="tooltip" style="display:none"></div>
   </div>
 
-  <div class="right-panel">
-    <div class="tap-section">
-      <h3>Your Tap</h3>
-      <div class="tap-badge ready" id="tapBadge">
-        <div class="tap-label">Status</div>
-        <div class="tap-value" id="tapValue">READY</div>
-        <div class="timer-bar"><div class="timer-fill" id="timerFill" style="width:100%"></div></div>
-      </div>
+  <!-- Faction strip -->
+  <div class="faction-strip" id="factionStrip"></div>
 
-      <div class="action-desc" id="actionDesc">Boost a faction's strength and expansion rate for one day.</div>
+  <!-- Events feed -->
+  <div class="events-scroll" id="eventsScroll"></div>
 
-      <div class="actions-grid">
-        <div class="action-btn selected" id="btn-bless" onclick="selectAction('bless')">
-          <span class="action-icon">✨</span>
-          <span class="action-name">BLESS</span>
+  <!-- Bottom action bar -->
+  <div class="action-bar">
+    <div class="tap-status-row">
+      <div class="tap-pill ready" id="tapPill">
+        <div>
+          <div class="tap-pill-label">Daily Tap</div>
+          <div class="tap-pill-value" id="tapValue">READY</div>
         </div>
-        <div class="action-btn" id="btn-plague" onclick="selectAction('plague')">
-          <span class="action-icon">☠️</span>
-          <span class="action-name">PLAGUE</span>
-        </div>
-        <div class="action-btn" id="btn-bounty" onclick="selectAction('bounty')">
-          <span class="action-icon">💰</span>
-          <span class="action-name">BOUNTY</span>
-        </div>
-        <div class="action-btn" id="btn-quake" onclick="selectAction('quake')">
-          <span class="action-icon">🌋</span>
-          <span class="action-name">QUAKE</span>
+        <div class="tap-timer-track">
+          <div class="tap-timer-fill" id="timerFill" style="width:100%"></div>
         </div>
       </div>
     </div>
 
-    <div class="events-section">
-      <h3>World Events</h3>
-      <div class="events-list" id="eventsList"></div>
+    <div class="action-row">
+      <div class="act-btn selected" id="btn-bless" ontouchstart="" onclick="selectAction('bless')">
+        <span class="act-icon">✨</span>
+        <span class="act-name">Bless</span>
+      </div>
+      <div class="act-btn" id="btn-plague" ontouchstart="" onclick="selectAction('plague')">
+        <span class="act-icon">☠️</span>
+        <span class="act-name">Plague</span>
+      </div>
+      <div class="act-btn" id="btn-bounty" ontouchstart="" onclick="selectAction('bounty')">
+        <span class="act-icon">💰</span>
+        <span class="act-name">Bounty</span>
+      </div>
+      <div class="act-btn" id="btn-quake" ontouchstart="" onclick="selectAction('quake')">
+        <span class="act-icon">🌋</span>
+        <span class="act-name">Quake</span>
+      </div>
     </div>
+
+    <div class="act-desc" id="actDesc">Boost a faction — they expand aggressively for one day.</div>
   </div>
 
+  <div class="safe-bottom"></div>
 </div>
 
+<div class="desktop-hint">↑ Phone layout preview — open on mobile for the real feel</div>
+
 <script>
-// ─── CONFIG ────────────────────────────────────────────────────────────────
-const COLS = 96;
-const ROWS = 54;
-const CELL = 9;
-const DAY_MS = 30000; // 30 real seconds = 1 day at 1x
+// ── CONFIG ──────────────────────────────────────────────────────────────────
+const DAY_MS = 30000; // 30s = 1 day in prototype
 
 const FACTIONS = [
-  { id:1, name:'Ironclad Empire',  color:'#d94040', rgb:[217,64,64]  },
-  { id:2, name:'Azure League',     color:'#3a8fd4', rgb:[58,143,212] },
-  { id:3, name:'Verdant Tribes',   color:'#2db86e', rgb:[45,184,110] },
-  { id:4, name:'Violet Order',     color:'#a050d0', rgb:[160,80,208] },
-  { id:5, name:'Amber Nomads',     color:'#d4a020', rgb:[212,160,32] },
+  { id:1, name:'Ironclad', color:'#d94040', rgb:[217,64,64]  },
+  { id:2, name:'Azure',    color:'#3a90d4', rgb:[58,144,212] },
+  { id:3, name:'Verdant',  color:'#2db86e', rgb:[45,184,110] },
+  { id:4, name:'Violet',   color:'#a050d0', rgb:[160,80,208] },
+  { id:5, name:'Amber',    color:'#d4a020', rgb:[212,160,32] },
 ];
 
-const NEUTRAL_RGB = [14, 14, 30];
-const RES_RGB     = [255, 235, 80];
+const NEUTRAL_RGB = [12, 12, 26];
+const RES_RGB     = [255, 232, 60];
 
 const ACTION_DESCS = {
-  bless:  'Boost a faction\'s strength and expansion rate for one day.',
-  plague: 'Weaken a faction — their cells lose strength and shrink.',
-  bounty: 'Seed a rich resource zone. Factions will fight over it.',
-  quake:  'Erase all claims in a wide radius. Reset the front lines.',
+  bless:  'Boost a faction — they expand aggressively for one day.',
+  plague: 'Weaken a faction — their cells decay and shrink back.',
+  bounty: 'Drop a rich resource node — factions fight over it.',
+  quake:  'Erase all claims in a wide radius. Reset the front.',
 };
 
-// ─── STATE ─────────────────────────────────────────────────────────────────
-// cell: { f, s, r, eff, effAge }
-//   f = faction id (0 = neutral)
-//   s = strength 1-10
-//   r = resource 0-3
-//   eff = null | 'bless'|'plague'|'bounty'|'quake'
-//   effAge = frames since effect applied
+// Grid dimensions — fit canvas to phone shell width
+let COLS, ROWS, CELL;
 
+function calcGrid() {
+  const shell = document.querySelector('.shell');
+  const W = shell.clientWidth;
+  // Estimate available height for map
+  // shell height - status bar ~26 - header ~46 - faction strip ~40
+  //              - events ~120 - action bar ~150 - safe ~8
+  const H = shell.clientHeight - 26 - 46 - 40 - 120 - 150 - 8;
+  CELL = 10;
+  COLS = Math.floor(W / CELL);
+  ROWS = Math.floor(Math.max(H, 200) / CELL);
+  canvas.width  = COLS * CELL;
+  canvas.height = ROWS * CELL;
+}
+
+// ── STATE ───────────────────────────────────────────────────────────────────
 let grid = [];
-let stats = [null]; // stats[1..5]
+let stats = [null];
 let day = 1;
 let tapUsed = false;
 let tapTimer = 0;
 let selectedAction = 'bless';
-let hoverXY = null;
 let tickN = 0;
 let speed = 1;
 let lastTickT = 0;
 let lastFrameT = 0;
 let canvas, ctx;
 
-// ─── INIT ──────────────────────────────────────────────────────────────────
+const speeds = [1, 3, 10];
+let speedIdx = 0;
+
+// ── INIT ────────────────────────────────────────────────────────────────────
 function init() {
+  canvas = document.getElementById('mapCanvas');
+  ctx = canvas.getContext('2d');
+
+  calcGrid();
+
   for (let y = 0; y < ROWS; y++) {
     grid[y] = [];
     for (let x = 0; x < COLS; x++)
-      grid[y][x] = { f:0, s:0, r:0, eff:null, effAge:0 };
+      grid[y][x] = { f:0, s:0, r:0, eff:null, ea:0 };
   }
 
+  const cx = Math.floor(COLS/2), cy = Math.floor(ROWS/2);
   const starts = [
-    { f:1, x:9,       y:8       },
-    { f:2, x:COLS-10, y:8       },
-    { f:3, x:9,       y:ROWS-9  },
-    { f:4, x:COLS-10, y:ROWS-9  },
-    { f:5, x:Math.floor(COLS/2), y:Math.floor(ROWS/2) },
+    { f:1, x:Math.floor(COLS*0.12), y:Math.floor(ROWS*0.18) },
+    { f:2, x:Math.floor(COLS*0.88), y:Math.floor(ROWS*0.18) },
+    { f:3, x:Math.floor(COLS*0.12), y:Math.floor(ROWS*0.82) },
+    { f:4, x:Math.floor(COLS*0.88), y:Math.floor(ROWS*0.82) },
+    { f:5, x:cx, y:cy },
   ];
 
   for (const s of starts) {
-    const R = 5;
-    for (let dy = -R; dy <= R; dy++) {
-      for (let dx = -R; dx <= R; dx++) {
-        const d2 = dx*dx + dy*dy;
-        if (d2 > R*R) continue;
-        const nx = s.x+dx, ny = s.y+dy;
-        if (!inBounds(nx,ny)) continue;
-        grid[ny][nx] = { f:s.f, s: Math.max(1, 9 - Math.ceil(Math.sqrt(d2))), r:0, eff:null, effAge:0 };
-      }
+    const R = Math.max(4, Math.floor(Math.min(COLS,ROWS)*0.09));
+    for (let dy=-R; dy<=R; dy++) for (let dx=-R; dx<=R; dx++) {
+      const d2=dx*dx+dy*dy;
+      if (d2>R*R) continue;
+      const nx=s.x+dx, ny=s.y+dy;
+      if (!ib(nx,ny)) continue;
+      grid[ny][nx]={ f:s.f, s:Math.max(1,9-Math.ceil(Math.sqrt(d2))), r:0, eff:null, ea:0 };
     }
   }
 
-  // Resources: prefer neutral land
-  for (let i = 0; i < 140; i++) {
-    const x = Math.floor(Math.random()*COLS);
-    const y = Math.floor(Math.random()*ROWS);
-    if (grid[y][x].f === 0)
-      grid[y][x].r = Math.floor(Math.random()*3)+1;
+  const rCount = Math.floor(COLS*ROWS*0.025);
+  for (let i=0; i<rCount; i++) {
+    const x=ri(COLS), y=ri(ROWS);
+    if (grid[y][x].f===0) grid[y][x].r = ri(3)+1;
   }
-  for (let i = 0; i < 40; i++) {
-    const x = Math.floor(Math.random()*COLS);
-    const y = Math.floor(Math.random()*ROWS);
+  for (let i=0; i<Math.floor(rCount*0.3); i++) {
+    const x=ri(COLS), y=ri(ROWS);
     grid[y][x].r = Math.max(grid[y][x].r, 1);
   }
 
-  for (const f of FACTIONS)
-    stats.push({ ...f, territory:0, resources:0, blessed:0, plagued:0 });
+  for (const f of FACTIONS) stats.push({ ...f, territory:0, resources:0, blessed:0, plagued:0 });
 
-  canvas = document.getElementById('mapCanvas');
-  canvas.width  = COLS * CELL;
-  canvas.height = ROWS * CELL;
-  ctx = canvas.getContext('2d');
+  canvas.addEventListener('click', onTap);
+  canvas.addEventListener('touchend', onTouchEnd, { passive: false });
 
-  canvas.addEventListener('mousemove', onMouseMove);
-  canvas.addEventListener('mouseleave', () => { hoverXY=null; hideTooltip(); });
-  canvas.addEventListener('click', onMapClick);
-
-  recalcStats();
-  updateFactionUI();
-  addEvent('Five powers rise. The world holds its breath.', false);
+  recalc();
+  updateFactionStrip();
+  addEvent('Five powers stir in the darkness. The world watches.', false);
+  updateClock();
+  setInterval(updateClock, 10000);
   requestAnimationFrame(loop);
 }
 
-// ─── SIMULATION TICK ───────────────────────────────────────────────────────
+// ── SIMULATION ──────────────────────────────────────────────────────────────
 function tick() {
   tickN++;
   const cells = shuffle(allCells());
 
   for (const [x,y] of cells) {
     const c = grid[y][x];
-    if (c.f === 0) continue;
-
+    if (c.f===0) continue;
     const st = stats[c.f];
 
-    // Recover strength
     if (c.s < 10) {
-      const chance = 0.04 + (c.r>0 ? 0.02 : 0) + (st.blessed>0 ? 0.04 : 0);
-      if (Math.random() < chance) c.s = Math.min(10, c.s+1);
+      const ch = 0.04 + (c.r>0?0.02:0) + (st.blessed>0?0.05:0);
+      if (Math.random()<ch) c.s = Math.min(10, c.s+1);
     }
-
-    // Plague decay
-    if (st.plagued > 0 && Math.random() < 0.025) {
+    if (st.plagued>0 && Math.random()<0.03) {
       c.s--;
-      if (c.s <= 0) { c.f=0; c.s=0; continue; }
+      if (c.s<=0) { c.f=0; c.s=0; continue; }
     }
+    if (c.s<3) continue;
 
-    if (c.s < 3) continue;
+    const ec = 0.013 + c.s*0.003 + (c.r>0?0.01:0) + (st.blessed>0?0.03:0);
+    if (Math.random()>ec) continue;
 
-    // Expansion / attack
-    const expandChance = 0.012 + c.s*0.003 + (c.r>0 ? 0.01:0) + (st.blessed>0 ? 0.025:0);
-    if (Math.random() > expandChance) continue;
-
-    const nbrs = shuffle(neighbors(x, y));
+    const nbrs = shuffle(neighbors(x,y));
     for (const [nx,ny] of nbrs) {
       const nc = grid[ny][nx];
-      if (nc.f === 0) {
-        // Settle neutral — resource nodes are magnetic
-        if (Math.random() < (nc.r>0 ? 0.75 : 0.35)) {
-          grid[ny][nx] = { f:c.f, s:1, r:nc.r, eff:null, effAge:0 };
+      if (nc.f===0) {
+        if (Math.random() < (nc.r>0?0.75:0.35)) {
+          grid[ny][nx]={ f:c.f, s:1, r:nc.r, eff:null, ea:0 };
           break;
         }
-      } else if (nc.f !== c.f) {
-        const atk = c.s + (st.blessed>0 ? 2:0);
-        const def = nc.s + (stats[nc.f].blessed>0 ? 1:0) - (stats[nc.f].plagued>0 ? 1:0);
-        if (Math.random() < atk / (atk + Math.max(1,def) + 0.5)) {
+      } else if (nc.f!==c.f) {
+        const atk = c.s + (st.blessed>0?2:0);
+        const def = nc.s + (stats[nc.f].blessed>0?1:0) - (stats[nc.f].plagued>0?1:0);
+        if (Math.random() < atk/(atk+Math.max(1,def)+0.5)) {
           nc.s--;
-          if (nc.s <= 0) grid[ny][nx] = { f:c.f, s:1, r:nc.r, eff:null, effAge:0 };
+          if (nc.s<=0) grid[ny][nx]={ f:c.f, s:1, r:nc.r, eff:null, ea:0 };
         }
         break;
       }
     }
   }
 
-  // Decay buffs
-  for (let i=1; i<=5; i++) {
-    if (stats[i].blessed > 0) stats[i].blessed--;
-    if (stats[i].plagued > 0) stats[i].plagued--;
+  for (let i=1;i<=5;i++) {
+    if (stats[i].blessed>0) stats[i].blessed--;
+    if (stats[i].plagued>0) stats[i].plagued--;
   }
+  for (let y=0;y<ROWS;y++)
+    for (let x=0;x<COLS;x++)
+      if (grid[y][x].eff) { grid[y][x].ea++; if (grid[y][x].ea>22) grid[y][x].eff=null; }
 
-  // Decay visual effects
-  for (let y=0; y<ROWS; y++)
-    for (let x=0; x<COLS; x++)
-      if (grid[y][x].eff) { grid[y][x].effAge++; if (grid[y][x].effAge>24) grid[y][x].eff=null; }
-
-  recalcStats();
-  if (tickN % 6 === 0) updateFactionUI();
-  if (tickN % 45 === 0) generateEvent();
+  recalc();
+  if (tickN%6===0)  updateFactionStrip();
+  if (tickN%50===0) generateEvent();
 }
 
-// ─── RENDER ────────────────────────────────────────────────────────────────
+// ── RENDER ───────────────────────────────────────────────────────────────────
 function render() {
   const img = ctx.createImageData(COLS*CELL, ROWS*CELL);
   const d = img.data;
@@ -536,80 +536,61 @@ function render() {
       const c = grid[cy][cx];
       let r, g, b;
 
-      if (c.f === 0) {
+      if (c.f===0) {
         [r,g,b] = NEUTRAL_RGB;
       } else {
-        const bright = 0.25 + (c.s/10)*0.75;
-        const frgb = FACTIONS[c.f-1].rgb;
-        r = frgb[0]*bright; g = frgb[1]*bright; b = frgb[2]*bright;
+        const br = 0.22 + (c.s/10)*0.78;
+        const fr = FACTIONS[c.f-1].rgb;
+        r=fr[0]*br; g=fr[1]*br; b=fr[2]*br;
       }
 
-      // Effect overlay
       if (c.eff) {
-        const t = Math.max(0, 1 - c.effAge/24);
-        if (c.eff==='bless')  { r+=80*t; g+=60*t; b+=220*t; }
-        if (c.eff==='plague') { r+=100*t; g*=(1-t*0.8); b*=(1-t*0.8); }
-        if (c.eff==='bounty') { r+=40*t; g+=160*t; b*=(1-t*0.5); }
-        if (c.eff==='quake')  { r=200*t; g=100*t; b=0; }
+        const t = Math.max(0, 1-c.ea/22);
+        if (c.eff==='bless')  { r+=70*t; g+=50*t; b+=210*t; }
+        if (c.eff==='plague') { r+=110*t; g*=(1-t*0.85); b*=(1-t*0.85); }
+        if (c.eff==='bounty') { r+=30*t; g+=160*t; b*=(1-t*0.6); }
+        if (c.eff==='quake')  { r=220*t; g=80*t; b=0; }
       }
 
-      // Hover highlight
-      if (hoverXY && hoverXY[0]===cx && hoverXY[1]===cy) { r+=40; g+=40; b+=40; }
+      r=clamp(r); g=clamp(g); b=clamp(b);
 
-      r = Math.min(255, Math.max(0, r));
-      g = Math.min(255, Math.max(0, g));
-      b = Math.min(255, Math.max(0, b));
-
-      // Write CELL×CELL block
       for (let py=0; py<CELL; py++) {
         for (let px=0; px<CELL; px++) {
-          const edge = (px===0||py===0) ? 0.65 : 1.0;
-          const pi = ((cy*CELL+py)*COLS*CELL + (cx*CELL+px))*4;
-          d[pi]   = r*edge;
-          d[pi+1] = g*edge;
-          d[pi+2] = b*edge;
-          d[pi+3] = 255;
+          const edge = (px===0||py===0) ? 0.62 : 1.0;
+          const pi = ((cy*CELL+py)*COLS*CELL+(cx*CELL+px))*4;
+          d[pi]=r*edge; d[pi+1]=g*edge; d[pi+2]=b*edge; d[pi+3]=255;
         }
       }
 
-      // Resource dot
-      if (c.r > 0) {
-        const dotR = Math.min(2, c.r);
-        const dcx = cx*CELL + Math.floor(CELL/2);
-        const dcy = cy*CELL + Math.floor(CELL/2);
-        for (let dy=-dotR; dy<=dotR; dy++) {
-          for (let dx=-dotR; dx<=dotR; dx++) {
-            if (dx*dx+dy*dy > dotR*dotR) continue;
-            const px=dcx+dx, py=dcy+dy;
-            if (px<0||px>=COLS*CELL||py<0||py>=ROWS*CELL) continue;
-            const pi=(py*COLS*CELL+px)*4;
-            d[pi]=RES_RGB[0]; d[pi+1]=RES_RGB[1]; d[pi+2]=RES_RGB[2]; d[pi+3]=220;
-          }
+      if (c.r>0) {
+        const dr=Math.min(2,c.r);
+        const dcx=cx*CELL+Math.floor(CELL/2), dcy=cy*CELL+Math.floor(CELL/2);
+        for (let dy=-dr;dy<=dr;dy++) for (let dx=-dr;dx<=dr;dx++) {
+          if (dx*dx+dy*dy>dr*dr) continue;
+          const px=dcx+dx, py=dcy+dy;
+          if (px<0||px>=COLS*CELL||py<0||py>=ROWS*CELL) continue;
+          const pi=(py*COLS*CELL+px)*4;
+          d[pi]=RES_RGB[0]; d[pi+1]=RES_RGB[1]; d[pi+2]=RES_RGB[2]; d[pi+3]=215;
         }
       }
     }
   }
-
   ctx.putImageData(img, 0, 0);
 }
 
-// ─── GAME LOOP ─────────────────────────────────────────────────────────────
+// ── LOOP ────────────────────────────────────────────────────────────────────
 function loop(now) {
-  const frameDt = Math.min(now - lastFrameT, 100); // cap at 100ms to avoid jumps
+  const dt = Math.min(now-lastFrameT, 100);
   lastFrameT = now;
 
-  if (now - lastTickT >= 220 / speed) {
-    lastTickT = now;
-    tick();
-  }
+  if (now-lastTickT >= 220/speed) { lastTickT=now; tick(); }
 
-  if (tapUsed && frameDt > 0) {
-    tapTimer = Math.max(0, tapTimer - frameDt);
-    if (tapTimer <= 0) {
-      tapUsed = false;
-      day++;
-      document.getElementById('dayNum').textContent = day;
-      addEvent(`Day ${day} dawns. Your power stirs once more.`, false);
+  if (tapUsed && dt>0) {
+    tapTimer = Math.max(0, tapTimer-dt);
+    if (tapTimer<=0) {
+      tapUsed=false; day++;
+      document.getElementById('dayNum').textContent=day;
+      addEvent(`Day ${day}. Your power returns.`, false);
     }
   }
 
@@ -618,238 +599,209 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
-// ─── PLAYER ACTION ─────────────────────────────────────────────────────────
-function onMapClick(e) {
-  if (tapUsed) { addEvent('Your tap is spent. The world churns without you.', false); return; }
-  const [x,y] = cellFromEvent(e);
-  if (!inBounds(x,y)) return;
-  applyAction(x,y);
+// ── PLAYER ACTION ────────────────────────────────────────────────────────────
+function onTouchEnd(e) {
+  e.preventDefault();
+  const touch = e.changedTouches[0];
+  handleTap(touch.clientX, touch.clientY);
 }
 
-function applyAction(x,y) {
-  const c = grid[y][x];
+function onTap(e) {
+  handleTap(e.clientX, e.clientY);
+}
 
+function handleTap(clientX, clientY) {
+  if (tapUsed) {
+    addEvent('Your tap is spent. The world churns without you.', false);
+    return;
+  }
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((clientX - rect.left) / CELL);
+  const y = Math.floor((clientY - rect.top)  / CELL);
+  if (!ib(x,y)) return;
+
+  spawnRipple(clientX, clientY);
+  applyAction(x, y);
+}
+
+function applyAction(x, y) {
+  const c = grid[y][x];
   switch (selectedAction) {
     case 'bless': {
-      if (c.f===0) { addEvent('Nothing to bless here — choose a faction\'s land.', false); return; }
-      stats[c.f].blessed = 100;
-      flashFaction(c.f, 'bless');
-      addEvent(`Your blessing surges through ${FACTIONS[c.f-1].name}. They advance.`, true);
+      if (c.f===0) { addEvent('Tap a faction\'s territory to bless them.', false); return; }
+      stats[c.f].blessed=110;
+      flashFaction(c.f,'bless');
+      addEvent(`Your blessing surges through ${FACTIONS[c.f-1].name}. Their banners advance.`, true);
       break;
     }
     case 'plague': {
-      if (c.f===0) { addEvent('Nothing to plague here — choose a faction\'s land.', false); return; }
-      stats[c.f].plagued = 100;
-      flashFaction(c.f, 'plague');
-      addEvent(`Sickness spreads through ${FACTIONS[c.f-1].name}. They falter.`, true);
+      if (c.f===0) { addEvent('Tap a faction\'s territory to curse them.', false); return; }
+      stats[c.f].plagued=110;
+      flashFaction(c.f,'plague');
+      addEvent(`Sickness spreads through ${FACTIONS[c.f-1].name}. Soldiers falter.`, true);
       break;
     }
     case 'bounty': {
-      const R = 3;
-      for (let dy=-R; dy<=R; dy++) {
-        for (let dx=-R; dx<=R; dx++) {
-          if (dx*dx+dy*dy>R*R) continue;
-          const nx=x+dx, ny=y+dy;
-          if (!inBounds(nx,ny)) continue;
-          grid[ny][nx].r = Math.max(grid[ny][nx].r, 2);
-          grid[ny][nx].eff = 'bounty'; grid[ny][nx].effAge = 0;
-        }
+      const R=3;
+      for (let dy=-R;dy<=R;dy++) for (let dx=-R;dx<=R;dx++) {
+        if (dx*dx+dy*dy>R*R) continue;
+        const nx=x+dx,ny=y+dy;
+        if (!ib(nx,ny)) continue;
+        grid[ny][nx].r=Math.max(grid[ny][nx].r,2);
+        grid[ny][nx].eff='bounty'; grid[ny][nx].ea=0;
       }
       addEvent(`Riches emerge at your chosen site. All factions take notice.`, true);
       break;
     }
     case 'quake': {
-      const R = 5;
-      for (let dy=-R; dy<=R; dy++) {
-        for (let dx=-R; dx<=R; dx++) {
-          if (dx*dx+dy*dy>R*R) continue;
-          const nx=x+dx, ny=y+dy;
-          if (!inBounds(nx,ny)) continue;
-          grid[ny][nx].f=0; grid[ny][nx].s=0;
-          grid[ny][nx].eff='quake'; grid[ny][nx].effAge=0;
-        }
+      const R=5;
+      for (let dy=-R;dy<=R;dy++) for (let dx=-R;dx<=R;dx++) {
+        if (dx*dx+dy*dy>R*R) continue;
+        const nx=x+dx,ny=y+dy;
+        if (!ib(nx,ny)) continue;
+        grid[ny][nx].f=0; grid[ny][nx].s=0;
+        grid[ny][nx].eff='quake'; grid[ny][nx].ea=0;
       }
-      addEvent(`The earth tears open. Borders dissolve. The contest resets.`, true);
+      addEvent(`The earth tears. Borders dissolve. A new contest begins.`, true);
       break;
     }
   }
-
-  tapUsed = true;
-  tapTimer = DAY_MS / speed;
-  recalcStats();
-  updateFactionUI();
+  tapUsed=true;
+  tapTimer=DAY_MS/speed;
+  recalc(); updateFactionStrip();
 }
 
 function flashFaction(fid, eff) {
-  for (let y=0; y<ROWS; y++)
-    for (let x=0; x<COLS; x++)
-      if (grid[y][x].f===fid) { grid[y][x].eff=eff; grid[y][x].effAge=0; }
+  for (let y=0;y<ROWS;y++)
+    for (let x=0;x<COLS;x++)
+      if (grid[y][x].f===fid) { grid[y][x].eff=eff; grid[y][x].ea=0; }
 }
 
-// ─── INTERACTION ───────────────────────────────────────────────────────────
-function onMouseMove(e) {
-  const [x,y] = cellFromEvent(e);
-  if (inBounds(x,y)) { hoverXY=[x,y]; showTooltip(e,x,y); }
-  else { hoverXY=null; hideTooltip(); }
+function spawnRipple(cx, cy) {
+  const wrap = document.getElementById('mapWrap');
+  const el = document.createElement('div');
+  el.className='ripple';
+  el.style.cssText=`width:40px;height:40px;left:${cx-wrap.getBoundingClientRect().left-20}px;top:${cy-wrap.getBoundingClientRect().top-20}px`;
+  wrap.appendChild(el);
+  el.addEventListener('animationend', ()=>el.remove());
 }
 
-function showTooltip(e,x,y) {
-  const c = grid[y][x];
-  const tt = document.getElementById('tooltip');
-  let html = '';
-  if (c.f===0) {
-    html = '<strong style="color:#6060a0">Neutral Territory</strong>';
-  } else {
-    const f = FACTIONS[c.f-1];
-    html = `<strong style="color:${f.color}">${f.name}</strong><br>Hold strength: ${c.s}/10`;
-    if (stats[c.f].blessed>0) html+='<br><span style="color:#a090ff">✨ Blessed</span>';
-    if (stats[c.f].plagued>0) html+='<br><span style="color:#ff6060">☠ Plagued</span>';
-  }
-  if (c.r>0) html += `<br><span style="color:#ffe060">💰 Resources: ${c.r}</span>`;
-
-  tt.innerHTML = html;
-  tt.style.display = 'block';
-
-  const area = document.getElementById('mapArea') || canvas.parentElement;
-  const ar = area.getBoundingClientRect();
-  let tx = e.clientX - ar.left + 14;
-  let ty = e.clientY - ar.top + 14;
-  if (tx + 170 > ar.width) tx -= 180;
-  tt.style.left = tx+'px';
-  tt.style.top  = ty+'px';
-}
-
-function hideTooltip() { document.getElementById('tooltip').style.display='none'; }
-
-function cellFromEvent(e) {
-  const r = canvas.getBoundingClientRect();
-  return [
-    Math.floor((e.clientX - r.left) / CELL),
-    Math.floor((e.clientY - r.top)  / CELL),
-  ];
-}
-
-// ─── UI UPDATES ────────────────────────────────────────────────────────────
+// ── UI ────────────────────────────────────────────────────────────────────────
 function selectAction(a) {
-  selectedAction = a;
-  document.querySelectorAll('.action-btn').forEach(b=>b.classList.remove('selected'));
+  selectedAction=a;
+  document.querySelectorAll('.act-btn').forEach(b=>b.classList.remove('selected'));
   document.getElementById('btn-'+a).classList.add('selected');
-  document.getElementById('actionDesc').textContent = ACTION_DESCS[a];
+  document.getElementById('actDesc').textContent=ACTION_DESCS[a];
 }
 
-function updateFactionUI() {
-  const total = COLS*ROWS;
-  const container = document.getElementById('factionList');
-  container.innerHTML='';
-  const sorted = [...FACTIONS].sort((a,b)=>stats[b.id].territory-stats[a.id].territory);
-  for (const f of sorted) {
-    const pct = Math.round(stats[f.id].territory/total*100);
-    const el = document.createElement('div');
-    el.className='faction-row';
-    el.innerHTML=`
-      <div class="faction-header">
-        <div class="faction-dot" style="background:${f.color}"></div>
-        <div class="faction-name">${f.name}</div>
-        <div class="faction-pct">${pct}%</div>
-      </div>
-      <div class="faction-bar">
-        <div class="faction-bar-fill" style="width:${Math.min(100,pct*2.2)}%;background:${f.color}"></div>
-      </div>`;
-    container.appendChild(el);
-  }
+function updateFactionStrip() {
+  const total=COLS*ROWS;
+  const sorted=[...FACTIONS].sort((a,b)=>stats[b.id].territory-stats[a.id].territory);
+  const strip=document.getElementById('factionStrip');
+  strip.innerHTML='';
+  sorted.forEach((f,i)=>{
+    const pct=Math.round(stats[f.id].territory/total*100);
+    const chip=document.createElement('div');
+    chip.className='faction-chip'+(i===0?' leading':'');
+    chip.innerHTML=`<div class="f-dot" style="background:${f.color}"></div>
+      <span class="f-name">${f.name}</span>
+      <span class="f-pct" style="color:${f.color}">${pct}%</span>`;
+    strip.appendChild(chip);
+  });
 }
 
 function updateTapUI() {
-  const badge  = document.getElementById('tapBadge');
-  const val    = document.getElementById('tapValue');
-  const fill   = document.getElementById('timerFill');
-
+  const pill=document.getElementById('tapPill');
+  const val=document.getElementById('tapValue');
+  const fill=document.getElementById('timerFill');
   if (!tapUsed) {
-    badge.className='tap-badge ready';
-    val.className='tap-value';
+    pill.className='tap-pill ready';
+    val.className='tap-pill-value';
     val.textContent='READY';
     fill.style.width='100%';
   } else {
-    badge.className='tap-badge used';
-    val.className='tap-value used';
-    const secs = Math.ceil(tapTimer/1000);
-    val.textContent=`Next in ${secs}s`;
-    const pct = (tapTimer / (DAY_MS/speed))*100;
-    fill.style.width=Math.max(0,pct)+'%';
+    pill.className='tap-pill';
+    val.className='tap-pill-value waiting';
+    val.textContent=`Next tap in ${Math.ceil(tapTimer/1000)}s`;
+    fill.style.width=Math.max(0,(tapTimer/(DAY_MS/speed))*100)+'%';
   }
 }
 
 function addEvent(text, isPlayer) {
-  const list = document.getElementById('eventsList');
-  const el = document.createElement('div');
-  el.className='event-item'+(isPlayer?' player':'');
-  el.innerHTML=`<span class="event-day">DAY ${day}</span>${text}`;
+  const list=document.getElementById('eventsScroll');
+  const el=document.createElement('div');
+  el.className='event-pill'+(isPlayer?' player':'');
+  el.innerHTML=`<span class="eday">Day ${day}</span>${text}`;
   list.insertBefore(el, list.firstChild);
-  while (list.children.length>22) list.removeChild(list.lastChild);
+  while(list.children.length>18) list.removeChild(list.lastChild);
 }
 
 function generateEvent() {
   const total=COLS*ROWS;
   const sorted=[...FACTIONS].sort((a,b)=>stats[b.id].territory-stats[a.id].territory);
-  const lead=sorted[0], weak=sorted[sorted.length-1];
-  const leadPct=Math.round(stats[lead.id].territory/total*100);
-  const weakPct=Math.round(stats[weak.id].territory/total*100);
-  const mid=sorted[Math.floor(Math.random()*3)];
-  const templates=[
-    `${lead.name} commands ${leadPct}% of all known territory.`,
-    `${weak.name} clings to ${weakPct}% — their extinction looms.`,
-    `Scouts report a bitter stalemate between ${sorted[0].name} and ${sorted[1].name}.`,
-    `${mid.name} marshals forces along a contested frontier.`,
-    `Resource wars intensify in the heartlands.`,
-    `Unclaimed lands near the center draw hungry eyes.`,
-    `A generation of soldiers has known nothing but war.`,
-    `The balance of power shifts — slowly, inexorably.`,
+  const lead=sorted[0], weak=sorted[4];
+  const mid=sorted[ri(3)];
+  const lp=Math.round(stats[lead.id].territory/total*100);
+  const wp=Math.round(stats[weak.id].territory/total*100);
+  const msgs=[
+    `${lead.name} commands ${lp}% of all known territory.`,
+    `${weak.name} clings to ${wp}% — their end may be near.`,
+    `${sorted[0].name} and ${sorted[1].name} clash along a bloody front.`,
+    `${mid.name} consolidates, marshalling strength for a push.`,
+    `Unclaimed resource zones draw desperate scouts.`,
+    `The balance shifts. Slowly. Inexorably.`,
   ];
-  addEvent(templates[Math.floor(Math.random()*templates.length)], false);
+  addEvent(msgs[ri(msgs.length)], false);
 }
 
-// ─── SPEED ─────────────────────────────────────────────────────────────────
-function setSpeed(s) {
-  if (tapUsed) tapTimer = tapTimer * speed / s; // preserve remaining fraction
-  speed = s;
-  document.querySelectorAll('.speed-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('sp'+s).classList.add('active');
+function cycleSpeed() {
+  speedIdx=(speedIdx+1)%speeds.length;
+  const old=speed;
+  speed=speeds[speedIdx];
+  if (tapUsed) tapTimer=tapTimer*old/speed;
+  document.getElementById('speedToggle').textContent=speed+'×';
 }
 
-// ─── UTILS ─────────────────────────────────────────────────────────────────
-function inBounds(x,y) { return x>=0&&x<COLS&&y>=0&&y<ROWS; }
-
-function neighbors(x,y) {
-  const out=[];
-  const dirs=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];
-  for (const [dx,dy] of dirs) { const nx=x+dx,ny=y+dy; if(inBounds(nx,ny)) out.push([nx,ny]); }
-  return out;
+function updateClock() {
+  const now=new Date();
+  document.getElementById('clockDisplay').textContent=
+    now.getHours()+':'+(now.getMinutes()<10?'0':'')+now.getMinutes();
 }
 
-function allCells() {
-  const out=[];
-  for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++) out.push([x,y]);
-  return out;
+// ── UTILS ────────────────────────────────────────────────────────────────────
+function ib(x,y){ return x>=0&&x<COLS&&y>=0&&y<ROWS; }
+function ri(n){ return Math.floor(Math.random()*n); }
+function clamp(v){ return Math.min(255,Math.max(0,Math.round(v))); }
+
+function neighbors(x,y){
+  const o=[];
+  for(const[dx,dy] of[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]]){
+    const nx=x+dx,ny=y+dy; if(ib(nx,ny)) o.push([nx,ny]);
+  }
+  return o;
 }
 
-function recalcStats() {
-  for (let i=1;i<=5;i++) { stats[i].territory=0; stats[i].resources=0; }
-  for (let y=0;y<ROWS;y++)
-    for (let x=0;x<COLS;x++) {
-      const c=grid[y][x];
-      if (c.f>0) { stats[c.f].territory++; stats[c.f].resources+=c.r; }
-    }
+function allCells(){
+  const o=[];
+  for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++) o.push([x,y]);
+  return o;
 }
 
-function shuffle(a) {
-  for (let i=a.length-1;i>0;i--) {
-    const j=Math.floor(Math.random()*(i+1));
-    [a[i],a[j]]=[a[j],a[i]];
+function recalc(){
+  for(let i=1;i<=5;i++){stats[i].territory=0;stats[i].resources=0;}
+  for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++){
+    const c=grid[y][x];
+    if(c.f>0){stats[c.f].territory++;stats[c.f].resources+=c.r;}
+  }
+}
+
+function shuffle(a){
+  for(let i=a.length-1;i>0;i--){
+    const j=ri(i+1); [a[i],a[j]]=[a[j],a[i]];
   }
   return a;
 }
 
-// ─── GO ────────────────────────────────────────────────────────────────────
 init();
 </script>
 </body>
