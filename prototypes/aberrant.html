@@ -264,13 +264,12 @@ function spawnCreature(wave) {
   for (let i = 0; i < avail.length; i++) { roll -= weights[i]; if (roll <= 0) { type = avail[i][0]; break; } }
 
   const def = CREATURES[type];
-  // Aggressive scaling: wave 1 feels easy, wave 10 feels punishing
   const speedBoost = 1 + (wave - 1) * 0.16;
-  const hp  = def.baseHp  + (wave - 1) * 12;
+  const hp  = Math.round(def.baseHp * Math.pow(1.4, wave - 1)); // exponential HP
   const dmg = def.baseDmg + (wave - 1) * 5;
   const ess = def.essence + wave * 25;
 
-  g.creatures.push({ x: sx, y: sy, hp, maxHp: hp, speed: def.baseSpd * speedBoost, damage: dmg, essence: ess, type, r: def.r, emoji: def.emoji, id: Math.random() });
+  g.creatures.push({ x: sx, y: sy, hp, maxHp: hp, speed: def.baseSpd * speedBoost, damage: dmg, essence: ess, type, r: def.r, emoji: def.emoji, id: Math.random(), targetThrallId: null, retargetCooldown: Math.random() * 2 });
 }
 
 // ── MOVEMENT ──────────────────────────────────────────────────────────────────
@@ -319,16 +318,42 @@ function update(dt) {
     th.y = g.py + Math.sin(th.angle) * th.orbitR;
   }
 
-  // Creatures chase player, deal contact damage
+  // Creatures chase target — player, or a thrall from wave 4+
   for (const cr of g.creatures) {
-    const dx = g.px - cr.x, dy = g.py - cr.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
+    // Periodically re-evaluate target
+    cr.retargetCooldown -= dt;
+    if (cr.retargetCooldown <= 0) {
+      cr.retargetCooldown = 2.5 + Math.random() * 2;
+      if (g.wave >= 4 && g.thralls.length > 0 && Math.random() < 0.55) {
+        cr.targetThrallId = g.thralls[Math.floor(Math.random() * g.thralls.length)].id;
+      } else {
+        cr.targetThrallId = null;
+      }
+    }
+
+    // Resolve target
+    let tx = g.px, ty = g.py, targetThrall = null;
+    if (cr.targetThrallId !== null) {
+      targetThrall = g.thralls.find(th => th.id === cr.targetThrallId);
+      if (!targetThrall) cr.targetThrallId = null; // target died, fall back to player
+      else { tx = targetThrall.x; ty = targetThrall.y; }
+    }
+
+    const dx = tx - cr.x, dy = ty - cr.y;
+    const dist = Math.hypot(dx, dy);
     if (dist < 1) continue;
     cr.x += (dx / dist) * cr.speed * dt;
     cr.y += (dy / dist) * cr.speed * dt;
-    if (dist < 22 + cr.r) {
-      g.hp -= cr.damage * dt;
-      if (g.frame % 5 === 0) spawnParticles(g.px, g.py, '#7c3aed', 2);
+
+    // Contact damage
+    if (dist < (targetThrall ? 16 : 22) + cr.r) {
+      if (targetThrall) {
+        targetThrall.hp -= cr.damage * dt;
+        if (g.frame % 4 === 0) spawnParticles(targetThrall.x, targetThrall.y, '#ef4444', 2);
+      } else {
+        g.hp -= cr.damage * dt;
+        if (g.frame % 5 === 0) spawnParticles(g.px, g.py, '#7c3aed', 2);
+      }
     }
   }
 
@@ -349,6 +374,18 @@ function update(dt) {
 
   g.bolts     = g.bolts.filter(b => !b.hit && b.age < 2.2 && b.x > -100 && b.x < W + 100 && b.y > -100 && b.y < H + 100);
   g.creatures = g.creatures.filter(c => c.hp > 0);
+
+  // Thralls killed by enemies break free
+  const deadThralls = g.thralls.filter(th => th.hp <= 0);
+  for (const th of deadThralls) {
+    addFloater(th.x, th.y - 18, 'BROKEN FREE', '#ef4444');
+    spawnParticles(th.x, th.y, '#ef4444', 14);
+    spawnParticles(th.x, th.y, '#a855f7', 5);
+  }
+  if (deadThralls.length > 0) {
+    g.thralls = g.thralls.filter(th => th.hp > 0);
+    updateThrallPanel();
+  }
 
   for (const p of g.particles) { p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.alpha -= 0.025; }
   g.particles = g.particles.filter(p => p.alpha > 0);
@@ -381,6 +418,9 @@ function dominateCreature(cr) {
     color: THRALL_COLORS[idx % THRALL_COLORS.length],
     type: cr.type, r: cr.r * 0.85, emoji: cr.emoji,
     wave: g.wave,
+    id: Math.random(),
+    hp: Math.round(CREATURES[cr.type].baseHp * 1.5 * Math.pow(1.2, g.wave - 1)),
+    maxHp: Math.round(CREATURES[cr.type].baseHp * 1.5 * Math.pow(1.2, g.wave - 1)),
   });
   updateThrallPanel();
 }
@@ -456,6 +496,15 @@ function render() {
 
     ctx.font = `${Math.round(th.r * 1.5)}px serif`; ctx.textAlign = 'center';
     ctx.fillText('😵', th.x, th.y + th.r * 0.42);
+
+    // HP bar — only shown when damaged
+    if (th.hp < th.maxHp) {
+      const hpPct = Math.max(0, th.hp / th.maxHp);
+      ctx.fillStyle = '#12122a';
+      ctx.fillRect(th.x - th.r, th.y + th.r + 3, th.r * 2, 3);
+      ctx.fillStyle = hpPct > 0.5 ? '#22d3ee' : hpPct > 0.25 ? '#f59e0b' : '#ef4444';
+      ctx.fillRect(th.x - th.r, th.y + th.r + 3, th.r * 2 * hpPct, 3);
+    }
   }
 
   // Player
@@ -607,10 +656,12 @@ function updateThrallPanel() {
   // Show most recent 12, newest first
   const shown = thralls.slice().reverse().slice(0, 12);
   for (const th of shown) {
+    const hpPct = th.hp / th.maxHp;
+    const dotColor = hpPct > 0.6 ? th.color : hpPct > 0.3 ? '#f59e0b' : '#ef4444';
     const el = document.createElement('div');
     el.className = 'tp-node';
     el.innerHTML = `
-      <div class="tp-dot" style="background:${th.color}"></div>
+      <div class="tp-dot" style="background:${dotColor}"></div>
       <span class="tp-name">${th.emoji} ${CREATURE_LABELS[th.type] || th.type}</span>
       <span class="tp-wave">W${th.wave}</span>
     `;
