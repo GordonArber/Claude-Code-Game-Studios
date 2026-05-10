@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TRICKLE DOWN — Prototype</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #111;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 100vh;
+  font-family: 'Georgia', serif;
+  padding: 20px;
+  color: #eee;
+}
+h1 { font-size: 13px; letter-spacing: 6px; color: #aaa; margin-bottom: 4px; text-transform: uppercase; }
+.subtitle { font-size: 10px; color: #555; letter-spacing: 2px; margin-bottom: 14px; }
+
+.wrapper {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+canvas { display: block; border: 1px solid #222; background: #0d0d0d; }
+
+.panel {
+  width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card {
+  background: #161616;
+  border: 1px solid #252525;
+  border-radius: 8px;
+  padding: 12px;
+}
+.card h3 {
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #555;
+  margin-bottom: 10px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+.stat-label { color: #666; }
+.stat-val { color: #ccc; font-variant-numeric: tabular-nums; }
+.stat-val.bad { color: #cc4444; }
+.stat-val.good { color: #44cc88; }
+
+.eff-bar {
+  height: 6px;
+  background: #222;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+.eff-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #cc4444, #ccaa44);
+  border-radius: 3px;
+  transition: width 0.5s;
+}
+
+.coin-types { display: flex; flex-direction: column; gap: 5px; }
+.coin-btn {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 5px;
+  padding: 7px 10px;
+  cursor: pointer;
+  font-size: 10px;
+  color: #999;
+  text-align: left;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.coin-btn:hover { background: #222; border-color: #555; }
+.coin-btn.active { background: #1e1e0a; border-color: #888844; color: #ddcc55; }
+.coin-btn .icon { font-size: 14px; }
+.coin-btn .desc { font-size: 9px; color: #555; display: block; margin-top: 1px; }
+
+.drop-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #3a3000, #6a5a00);
+  border: 1px solid #888844;
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  font-family: 'Georgia', serif;
+  font-size: 14px;
+  color: #ddcc55;
+  letter-spacing: 2px;
+  transition: all 0.15s;
+}
+.drop-btn:hover { background: linear-gradient(135deg, #4a4000, #8a7a00); }
+.drop-btn:active { transform: scale(0.97); }
+
+.event-box {
+  font-size: 10px;
+  color: #888;
+  line-height: 1.6;
+  min-height: 50px;
+}
+.event-box .event-title { color: #cc9944; font-size: 11px; margin-bottom: 3px; }
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 6px;
+  font-size: 10px;
+  color: #666;
+}
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<h1>Trickle Down</h1>
+<div class="subtitle">economics · simulation · prototype</div>
+
+<div class="wrapper">
+
+<div class="panel">
+  <div class="card">
+    <h3>Drop Coin</h3>
+    <div class="coin-types" id="coinTypes">
+      <div class="coin-btn active" data-type="regular" onclick="selectCoin('regular',this)">
+        <span class="icon">🪙</span>
+        <div><div>Regular</div><span class="desc">Falls normally</span></div>
+      </div>
+      <div class="coin-btn" data-type="policy" onclick="selectCoin('policy',this)">
+        <span class="icon">📋</span>
+        <div><div>Policy</div><span class="desc">Neutralizes offshore pegs</span></div>
+      </div>
+      <div class="coin-btn" data-type="windfall" onclick="selectCoin('windfall',this)">
+        <span class="icon">💸</span>
+        <div><div>Windfall</div><span class="desc">Huge — still barely lands</span></div>
+      </div>
+    </div>
+    <br>
+    <button class="drop-btn" onclick="dropCoin()">DROP</button>
+    <div style="font-size:9px;color:#444;text-align:center;margin-top:6px">or click the board</div>
+  </div>
+
+  <div class="card">
+    <h3>Economy Report</h3>
+    <div class="stat-row"><span class="stat-label">Dropped</span><span class="stat-val" id="statDropped">0</span></div>
+    <div class="stat-row"><span class="stat-label">Reached workers</span><span class="stat-val good" id="statCaught">0</span></div>
+    <div class="stat-row"><span class="stat-label">Offshored</span><span class="stat-val bad" id="statOffshored">0</span></div>
+    <div class="stat-row"><span class="stat-label">Lobbied away</span><span class="stat-val bad" id="statLobbied">0</span></div>
+    <div class="stat-row" style="border-top:1px solid #222;padding-top:8px;margin-top:4px">
+      <span class="stat-label">Efficiency</span>
+      <span class="stat-val bad" id="statEff">—</span>
+    </div>
+    <div class="eff-bar"><div class="eff-fill" id="effFill" style="width:0%"></div></div>
+  </div>
+
+  <div class="card">
+    <h3>Crisis Event</h3>
+    <div class="event-box" id="eventBox">
+      <div class="event-title">Stable Markets</div>
+      Normal conditions. Offshore rate: 15%.
+    </div>
+    <button onclick="triggerCrisis()" style="margin-top:8px;width:100%;background:#1a0a0a;border:1px solid #442222;border-radius:5px;padding:6px;cursor:pointer;font-size:10px;color:#aa5555;">Trigger Crisis →</button>
+  </div>
+
+  <div class="card">
+    <h3>Legend</h3>
+    <div class="legend-row"><div class="legend-dot" style="background:#888"></div>Normal peg</div>
+    <div class="legend-row"><div class="legend-dot" style="background:#cc4444"></div>Offshore haven</div>
+    <div class="legend-row"><div class="legend-dot" style="background:#8844cc"></div>Lobbyist</div>
+    <div class="legend-row"><div class="legend-dot" style="background:#44aa66"></div>Worker (catches coins)</div>
+  </div>
+</div>
+
+<canvas id="c" width="390" height="680"></canvas>
+
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W = 390, H = 680;
+
+// ── CONFIG ──────────────────────────────────────────────────────────────────
+const BOARD_TOP = 120;
+const BOARD_BOT = 580;
+const WORKER_Y = 618;
+const N_WORKERS = 5;
+const SLOT_W = W / N_WORKERS;
+const PEG_R = 9;
+const COIN_R = 11;
+const GRAVITY = 0.38;
+
+// ── STATE ───────────────────────────────────────────────────────────────────
+let pegs = [];
+let coins = [];
+let particles = [];
+let workers = [];
+let selectedCoin = 'regular';
+let stats = { dropped:0, caught:0, offshored:0, lobbied:0 };
+let frameN = 0;
+let currentCrisis = null;
+let crisisTimer = 0;
+
+const CRISES = [
+  { name:'Tax Cut Bonanza', desc:'Offshore rate doubles. Lobbyists surge.', offshore:0.30, lobby:0.18 },
+  { name:'Supply Side Shock', desc:'All pegs become lobbyists temporarily.', offshore:0.05, lobby:0.50 },
+  { name:'Offshore Boom', desc:'New offshore havens open everywhere.', offshore:0.45, lobby:0.10 },
+  { name:'Deregulation Wave', desc:'Board reshuffles. More obstacles appear.', reshuffle:true },
+  { name:'Bailout Season', desc:'Workers shrink. Harder to catch coins.', offshore:0.20, lobby:0.20, workerShrink:true },
+];
+
+// ── INIT ────────────────────────────────────────────────────────────────────
+function initPegs(offshore=0.15, lobby=0.10) {
+  pegs = [];
+  const rows = 9;
+  const left = 20, right = 370;
+
+  for (let row = 0; row < rows; row++) {
+    const even = row % 2 === 0;
+    const count = even ? 5 : 4;
+    const spread = right - left;
+    const gap = spread / (even ? 4 : 3);
+    const startX = even ? left : left + gap*0.5;
+
+    for (let col = 0; col < count; col++) {
+      const x = startX + col * gap;
+      const y = BOARD_TOP + 20 + row * 50;
+      let type = 'normal';
+      const r = Math.random();
+      if (r < offshore) type = 'offshore';
+      else if (r < offshore + lobby) type = 'lobby';
+      pegs.push({ x, y, r: PEG_R, type, pulse:0, neutralized:0 });
+    }
+  }
+}
+
+function initWorkers(shrink=false) {
+  workers = [];
+  for (let i = 0; i < N_WORKERS; i++) {
+    workers.push({
+      x: i * SLOT_W + SLOT_W/2,
+      y: WORKER_Y,
+      r: shrink ? 12 : 18,
+      caught: 0,
+      flash: 0,
+    });
+  }
+}
+
+function init() {
+  initPegs();
+  initWorkers();
+  requestAnimationFrame(loop);
+}
+
+// ── COIN ────────────────────────────────────────────────────────────────────
+function dropCoin(xOverride) {
+  if (coins.length >= 8) return;
+  const x = xOverride !== undefined ? xOverride : W/2 + (Math.random()-0.5)*60;
+  const type = selectedCoin;
+  const r = type === 'windfall' ? 18 : COIN_R;
+  coins.push({
+    x, y: BOARD_TOP - 10,
+    vx: (Math.random()-0.5)*1.5,
+    vy: 1.5,
+    r, type, age:0, active:true, alpha:1,
+    offshoring: false, // fading out
+  });
+  stats.dropped++;
+  updateStatsUI();
+}
+
+function selectCoin(type, el) {
+  selectedCoin = type;
+  document.querySelectorAll('.coin-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  if (y < BOARD_TOP + 10) dropCoin(x);
+  else dropCoin(x);
+});
+
+// ── PHYSICS ─────────────────────────────────────────────────────────────────
+function updateCoins() {
+  for (const coin of coins) {
+    if (!coin.active) continue;
+    coin.age++;
+
+    if (coin.offshoring) {
+      coin.alpha -= 0.05;
+      coin.r *= 0.95;
+      if (coin.alpha <= 0) { coin.active = false; }
+      continue;
+    }
+
+    // Gravity
+    coin.vy = Math.min(coin.vy + GRAVITY, 14);
+    coin.x += coin.vx;
+    coin.y += coin.vy;
+    coin.vx *= 0.995;
+
+    // Walls
+    if (coin.x - coin.r < 8) { coin.x = 8+coin.r; coin.vx = Math.abs(coin.vx)*0.75; }
+    if (coin.x + coin.r > W-8) { coin.x = W-8-coin.r; coin.vx = -Math.abs(coin.vx)*0.75; }
+
+    // Peg collision
+    for (const peg of pegs) {
+      const dx = coin.x - peg.x;
+      const dy = coin.y - peg.y;
+      const dist = Math.sqrt(dx*dx+dy*dy);
+      const minDist = coin.r + peg.r;
+      if (dist < minDist && dist > 0.1) {
+        // Offshore
+        if (peg.type === 'offshore' && peg.neutralized <= 0 && coin.type !== 'policy') {
+          coin.offshoring = true;
+          stats.offshored++;
+          peg.pulse = 20;
+          spawnParticles(coin.x, coin.y, '#cc4444', 8);
+          updateStatsUI();
+          break;
+        }
+        // Policy neutralizes offshore
+        if (peg.type === 'offshore' && coin.type === 'policy') {
+          peg.neutralized = 180;
+          peg.type = 'normal';
+          spawnParticles(peg.x, peg.y, '#88ccff', 6);
+        }
+        // Lobby
+        if (peg.type === 'lobby' && peg.neutralized <= 0) {
+          coin.vy = -Math.abs(coin.vy) * 0.85;
+          coin.vx += (Math.random()-0.5)*3;
+          peg.pulse = 15;
+          if (coin.y > BOARD_BOT - 80) {
+            // Only count as lobbied if near bottom (otherwise it's just a bounce)
+          }
+        } else {
+          // Normal bounce
+          const ang = Math.atan2(dy, dx);
+          const spd = Math.sqrt(coin.vx*coin.vx+coin.vy*coin.vy);
+          const scatter = (Math.random()-0.5)*0.5;
+          coin.vx = Math.cos(ang+scatter)*spd*0.65;
+          coin.vy = Math.sin(ang+scatter)*spd*0.65;
+        }
+        // Push out
+        const overlap = minDist - dist + 0.5;
+        coin.x += (dx/dist)*overlap;
+        coin.y += (dy/dist)*overlap;
+        peg.pulse = Math.max(peg.pulse, 8);
+        break;
+      }
+    }
+
+    // Reached workers
+    if (coin.y + coin.r > BOARD_BOT) {
+      // Find worker
+      let caught = false;
+      for (const w of workers) {
+        const dx = Math.abs(coin.x - w.x);
+        if (dx < w.r + coin.r) {
+          w.caught++;
+          w.flash = 25;
+          stats.caught++;
+          coin.active = false;
+          spawnParticles(coin.x, coin.y, '#44cc88', 10);
+          caught = true;
+          break;
+        }
+      }
+      if (!caught) {
+        // Missed all workers
+        stats.lobbied++;
+        coin.active = false;
+        spawnParticles(coin.x, coin.y, '#555', 5);
+      }
+      updateStatsUI();
+    }
+
+    // Timeout
+    if (coin.age > 500) { coin.active = false; }
+  }
+
+  coins = coins.filter(c => c.active || c.offshoring);
+  coins = coins.filter(c => c.active);
+
+  // Peg timers
+  for (const peg of pegs) {
+    if (peg.pulse > 0) peg.pulse--;
+    if (peg.neutralized > 0) peg.neutralized--;
+  }
+}
+
+// ── PARTICLES ───────────────────────────────────────────────────────────────
+function spawnParticles(x, y, color, count) {
+  for (let i=0; i<count; i++) {
+    const ang = Math.random()*Math.PI*2;
+    const spd = 1+Math.random()*3;
+    particles.push({
+      x, y,
+      vx: Math.cos(ang)*spd,
+      vy: Math.sin(ang)*spd - 1,
+      r: 2+Math.random()*3,
+      color, alpha:1, life:40+Math.random()*20
+    });
+  }
+}
+
+function updateParticles() {
+  for (const p of particles) {
+    p.x += p.vx; p.y += p.vy;
+    p.vy += 0.1;
+    p.alpha -= 1/p.life;
+  }
+  particles = particles.filter(p=>p.alpha>0);
+}
+
+// ── RENDER ───────────────────────────────────────────────────────────────────
+function render() {
+  ctx.clearRect(0,0,W,H);
+
+  // Background gradient
+  const bg = ctx.createLinearGradient(0,0,0,H);
+  bg.addColorStop(0,'#0d0d0d');
+  bg.addColorStop(1,'#060608');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0,0,W,H);
+
+  // Billionaire zone
+  ctx.fillStyle = '#111108';
+  ctx.fillRect(0,0,W,BOARD_TOP);
+  ctx.strokeStyle = '#2a2a18';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0,BOARD_TOP); ctx.lineTo(W,BOARD_TOP); ctx.stroke();
+
+  // Billionaire figure
+  ctx.font = '32px serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('🎩', W/2, 45);
+  ctx.font = '10px sans-serif';
+  ctx.fillStyle = '#665500';
+  ctx.fillText('DROP WEALTH HERE', W/2, 62);
+
+  // Drop indicator arrow
+  if (frameN % 60 < 30) {
+    ctx.fillStyle = '#554400';
+    ctx.font = '14px sans-serif';
+    ctx.fillText('↓', W/2, 80);
+  }
+
+  // Board area subtle grid
+  ctx.strokeStyle = '#111';
+  ctx.lineWidth = 0.5;
+  for (let x=0; x<W; x+=30) {
+    ctx.beginPath(); ctx.moveTo(x,BOARD_TOP); ctx.lineTo(x,BOARD_BOT); ctx.stroke();
+  }
+
+  // Worker zone
+  ctx.fillStyle = '#0a120a';
+  ctx.fillRect(0, BOARD_BOT, W, H-BOARD_BOT);
+  ctx.strokeStyle = '#1a2a1a';
+  ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(0,BOARD_BOT); ctx.lineTo(W,BOARD_BOT); ctx.stroke();
+
+  // Slot dividers
+  ctx.strokeStyle = '#152015';
+  for (let i=1; i<N_WORKERS; i++) {
+    ctx.beginPath();
+    ctx.moveTo(i*SLOT_W, BOARD_BOT);
+    ctx.lineTo(i*SLOT_W, H);
+    ctx.stroke();
+  }
+
+  // Workers
+  for (const w of workers) {
+    const glow = w.flash > 0;
+    ctx.shadowColor = glow ? '#44cc88' : 'transparent';
+    ctx.shadowBlur = glow ? 15 : 0;
+    ctx.beginPath();
+    ctx.arc(w.x, w.y, w.r, 0, Math.PI*2);
+    ctx.fillStyle = glow ? '#55ee99' : '#2d6040';
+    ctx.fill();
+    ctx.strokeStyle = glow ? '#88ffbb' : '#3a7050';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    if (w.flash > 0) w.flash--;
+
+    // Caught count
+    ctx.fillStyle = '#88ccaa';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(w.caught, w.x, w.y + 4);
+
+    // Worker icon
+    ctx.font = '12px serif';
+    ctx.fillText('🧑', w.x, w.y - w.r - 6);
+  }
+
+  // "Workers" label
+  ctx.fillStyle = '#2a4a32';
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('WORKERS', W/2, H - 8);
+
+  // Pegs
+  for (const peg of pegs) {
+    const pulse = peg.pulse > 0;
+    let color, glowColor;
+    if (peg.neutralized > 0) {
+      color = '#446688'; glowColor = '#88aaff';
+    } else if (peg.type === 'offshore') {
+      color = pulse ? '#ff6666' : '#cc4444';
+      glowColor = '#ff4444';
+    } else if (peg.type === 'lobby') {
+      color = pulse ? '#bb66ff' : '#8844cc';
+      glowColor = '#aa44ff';
+    } else {
+      color = pulse ? '#aaaaaa' : '#555555';
+      glowColor = '#888888';
+    }
+
+    ctx.shadowColor = pulse ? glowColor : 'transparent';
+    ctx.shadowBlur = pulse ? 12 : 0;
+    ctx.beginPath();
+    ctx.arc(peg.x, peg.y, peg.r + (pulse?1:0), 0, Math.PI*2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // Coins
+  for (const coin of coins) {
+    ctx.globalAlpha = coin.alpha !== undefined ? coin.alpha : 1;
+    const color = coin.type === 'windfall' ? '#ffee00' :
+                  coin.type === 'policy' ? '#88ccff' : '#ddaa33';
+    const glow = coin.type === 'windfall' ? '#ffff00' : color;
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = coin.type === 'windfall' ? 20 : 8;
+    ctx.beginPath();
+    ctx.arc(coin.x, coin.y, coin.r, 0, Math.PI*2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = '#fff3';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+
+    // Coin symbol
+    if (coin.r >= 10) {
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.font = `${Math.floor(coin.r*1.1)}px serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(coin.type==='policy'?'📋':coin.type==='windfall'?'💸':'$', coin.x, coin.y+coin.r*0.4);
+    }
+  }
+
+  // Particles
+  for (const p of particles) {
+    ctx.globalAlpha = p.alpha;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+    ctx.fillStyle = p.color;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // Crisis overlay
+  if (crisisTimer > 0) {
+    const alpha = Math.min(1, crisisTimer/30) * 0.15;
+    ctx.fillStyle = `rgba(200,50,50,${alpha})`;
+    ctx.fillRect(0,0,W,H);
+    crisisTimer--;
+  }
+}
+
+// ── CRISIS ───────────────────────────────────────────────────────────────────
+function triggerCrisis() {
+  const crisis = CRISES[Math.floor(Math.random()*CRISES.length)];
+  currentCrisis = crisis;
+  crisisTimer = 180;
+
+  if (crisis.reshuffle) {
+    initPegs(0.25, 0.25);
+    initWorkers(false);
+  } else {
+    initPegs(crisis.offshore || 0.15, crisis.lobby || 0.10);
+    initWorkers(crisis.workerShrink || false);
+  }
+
+  document.getElementById('eventBox').innerHTML =
+    `<div class="event-title">${crisis.name}</div>${crisis.desc}`;
+}
+
+// ── STATS UI ─────────────────────────────────────────────────────────────────
+function updateStatsUI() {
+  document.getElementById('statDropped').textContent = stats.dropped;
+  document.getElementById('statCaught').textContent = stats.caught;
+  document.getElementById('statOffshored').textContent = stats.offshored;
+  document.getElementById('statLobbied').textContent = stats.lobbied;
+  const eff = stats.dropped > 0 ? Math.round(stats.caught/stats.dropped*100) : 0;
+  document.getElementById('statEff').textContent = eff+'%';
+  document.getElementById('effFill').style.width = Math.min(100,eff*3)+'%';
+}
+
+// ── LOOP ─────────────────────────────────────────────────────────────────────
+function loop() {
+  frameN++;
+  updateCoins();
+  updateParticles();
+  render();
+  requestAnimationFrame(loop);
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PYRAMID — Prototype</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #f5f0e8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 100vh;
+  font-family: 'Arial', sans-serif;
+  padding: 16px;
+}
+h1 { font-size: 11px; letter-spacing: 6px; color: #999; margin-bottom: 2px; text-transform: uppercase; }
+.subtitle { font-size: 9px; color: #bbb; letter-spacing: 2px; margin-bottom: 12px; }
+
+.game-wrap {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+canvas { display: block; border: 1px solid #ddd; background: #faf8f2; }
+
+.side-panel {
+  width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card {
+  background: white;
+  border: 1px solid #e0ddd8;
+  border-radius: 6px;
+  padding: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.card h3 {
+  font-size: 8px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #bbb;
+  margin-bottom: 8px;
+}
+
+.stat-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 11px; }
+.stat-label { color: #aaa; }
+.stat-val { color: #333; font-weight: bold; font-variant-numeric: tabular-nums; }
+.stat-val.money { color: #3a8a3a; }
+
+.hp-bar { height: 8px; background: #eee; border-radius: 4px; overflow: hidden; margin-top: 4px; }
+.hp-fill { height: 100%; background: linear-gradient(90deg, #cc4444, #ee8844); border-radius: 4px; transition: width 0.3s; }
+
+.wave-info {
+  font-size: 12px;
+  color: #555;
+  text-align: center;
+  padding: 8px;
+  background: #faf8ee;
+  border-radius: 5px;
+  border: 1px solid #e8e0cc;
+}
+.wave-num { font-size: 22px; font-weight: bold; color: #cc9900; display: block; }
+
+/* Org chart */
+.org-chart { max-height: 220px; overflow-y: auto; }
+.org-node {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px;
+  margin-bottom: 2px;
+  border-radius: 4px;
+  font-size: 10px;
+  color: #666;
+  background: #fafafa;
+  border: 1px solid #eee;
+}
+.org-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.org-indent { padding-left: 16px; }
+.org-commission { margin-left: auto; color: #3a8a3a; font-size: 9px; }
+
+/* Upgrade overlay */
+.upgrade-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(245,240,232,0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+  z-index: 100;
+  display: none;
+}
+.upgrade-overlay h2 {
+  font-size: 11px;
+  letter-spacing: 4px;
+  color: #aaa;
+  text-transform: uppercase;
+}
+.upgrade-cards {
+  display: flex;
+  gap: 12px;
+}
+.upgrade-card {
+  width: 160px;
+  background: white;
+  border: 2px solid #ddd;
+  border-radius: 10px;
+  padding: 16px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.upgrade-card:hover {
+  border-color: #cc9900;
+  box-shadow: 0 4px 16px rgba(200,150,0,0.2);
+  transform: translateY(-2px);
+}
+.upgrade-card .u-icon { font-size: 32px; margin-bottom: 8px; }
+.upgrade-card .u-name { font-size: 13px; font-weight: bold; color: #333; margin-bottom: 4px; }
+.upgrade-card .u-desc { font-size: 10px; color: #999; line-height: 1.5; }
+
+/* Game over */
+.gameover-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(245,240,232,0.97);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 200;
+  display: none;
+}
+.gameover-overlay h2 { font-size: 24px; color: #333; }
+.gameover-overlay .result { font-size: 13px; color: #888; }
+.gameover-overlay .commission { font-size: 28px; color: #3a8a3a; font-weight: bold; }
+.restart-btn {
+  background: #cc9900;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 24px;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  letter-spacing: 2px;
+  margin-top: 8px;
+}
+</style>
+</head>
+<body>
+
+<h1>Pyramid</h1>
+<div class="subtitle">mlm · survivors · prototype</div>
+
+<div class="game-wrap">
+
+<canvas id="c" width="500" height="500"></canvas>
+
+<div class="side-panel">
+
+  <div class="card">
+    <h3>Wave</h3>
+    <div class="wave-info">
+      <span class="wave-num" id="waveNum">1</span>
+      <span id="waveLabel">Prospects incoming</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Boss Stats</h3>
+    <div class="stat-row"><span class="stat-label">HP</span><span class="stat-val" id="hpVal">100</span></div>
+    <div class="hp-bar"><div class="hp-fill" id="hpFill" style="width:100%"></div></div>
+    <div style="height:8px"></div>
+    <div class="stat-row"><span class="stat-label">Commission</span><span class="stat-val money" id="commVal">$0</span></div>
+    <div class="stat-row"><span class="stat-label">Downline</span><span class="stat-val" id="downlineVal">0</span></div>
+    <div class="stat-row"><span class="stat-label">Converted</span><span class="stat-val" id="convertedVal">0</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Your Downline</h3>
+    <div class="org-chart" id="orgChart">
+      <div class="org-node">
+        <div class="org-dot" style="background:#cc9900"></div>
+        <span>You (Top)</span>
+      </div>
+      <div style="font-size:10px;color:#ccc;padding:4px 6px">No recruits yet</div>
+    </div>
+  </div>
+
+  <div class="card" style="font-size:10px;color:#aaa;line-height:1.7">
+    <h3>How to Play</h3>
+    Auto-pitch converts prospects.<br>
+    Recruits join your orbit + pitch too.<br>
+    Survive all waves to win.
+  </div>
+
+</div>
+</div>
+
+<!-- Upgrade overlay -->
+<div class="upgrade-overlay" id="upgradeOverlay">
+  <h2>⭐ Level Up — Choose Your Package</h2>
+  <div class="upgrade-cards" id="upgradeCards"></div>
+</div>
+
+<!-- Game over overlay -->
+<div class="gameover-overlay" id="gameoverOverlay">
+  <div style="font-size:40px">🏆</div>
+  <h2 id="goTitle">Downline Collapsed</h2>
+  <div class="result" id="goResult">Your pyramid has fallen.</div>
+  <div class="commission" id="goCommission">$0 earned</div>
+  <button class="restart-btn" onclick="restartGame()">BUILD AGAIN</button>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W = 500, H = 500;
+const CX = W/2, CY = H/2;
+
+// ── UPGRADES POOL ────────────────────────────────────────────────────────────
+const UPGRADES = [
+  { icon:'📢', name:'Better Script', desc:'Pitch rate +30%', apply: g => { g.pitchRate *= 1.3; } },
+  { icon:'💊', name:'Success Mindset', desc:'+40 max HP, heal 25', apply: g => { g.maxHp+=40; g.hp=Math.min(g.hp+25,g.maxHp); } },
+  { icon:'💰', name:'Premium Package', desc:'Pitch damage ×1.5', apply: g => { g.pitchDmg = Math.round(g.pitchDmg*1.5); } },
+  { icon:'🌀', name:'Compound Growth', desc:'Recruits recruit 2× faster', apply: g => { g.recruitSpeed *= 2; } },
+  { icon:'🎯', name:'Lifestyle Marketing', desc:'Attract from further away', apply: g => { g.pitchRange += 60; } },
+  { icon:'🚀', name:'Downline Incentive', desc:'Recruits pitch +50% faster', apply: g => { g.recruitPitchRate *= 1.5; } },
+  { icon:'🛡️', name:'Iron Mindset', desc:'+60 max HP, heal 40', apply: g => { g.maxHp+=60; g.hp=Math.min(g.hp+40,g.maxHp); } },
+  { icon:'⚡', name:'Hustle Culture', desc:'Pitch speed +40%', apply: g => { g.pitchSpeed *= 1.4; } },
+  { icon:'📈', name:'Passive Income', desc:'Earn $5/sec automatically', apply: g => { g.passiveIncome += 5; } },
+  { icon:'🔥', name:'Multi-Level Pitch', desc:'Each pitch hits up to 2 targets', apply: g => { g.multiPitch = (g.multiPitch||1)+1; } },
+];
+
+// ── GAME STATE ────────────────────────────────────────────────────────────────
+const RECRUIT_COLORS = ['#e05252','#5288e0','#52c97a','#c952e0','#e09a52','#52c9c9','#e0c952'];
+let g = {}; // global game state
+
+function resetGame() {
+  g = {
+    hp: 100, maxHp: 100,
+    commission: 0, passiveIncome: 0,
+    pitchRate: 1.2,       // pitches per second
+    pitchDmg: 25,
+    pitchSpeed: 280,
+    pitchRange: 200,
+    pitchCooldown: 0,
+    recruitPitchRate: 0.6,
+    recruitSpeed: 1,
+    multiPitch: 1,
+    wave: 1,
+    waveState: 'active', // active | upgrading | between | gameover
+    prospectsLeft: 8,
+    totalConverted: 0,
+    recruits: [],
+    prospects: [],
+    projectiles: [],
+    particles: [],
+    floaters: [],
+    recruitOrbitR: 55,
+    frame: 0,
+    lastTime: 0,
+  };
+  spawnWave(g.wave);
+}
+
+function spawnWave(wave) {
+  const count = 6 + wave * 3;
+  g.prospectsLeft = count;
+  document.getElementById('waveNum').textContent = wave;
+  document.getElementById('waveLabel').textContent = `${count} prospects incoming`;
+
+  // Stagger spawns
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => {
+      if (g.waveState !== 'active') return;
+      spawnProspect();
+    }, i * (Math.max(200, 900 - wave*60)));
+  }
+}
+
+function spawnProspect() {
+  const angle = Math.random() * Math.PI * 2;
+  const spawnR = 300;
+  const toughness = g.wave > 5 ? (Math.random() < 0.3 ? 'skeptic' : 'desperate') :
+                    (Math.random() < 0.15 ? 'skeptic' : 'desperate');
+  const hp = toughness === 'skeptic' ? 60 : 30;
+  g.prospects.push({
+    x: CX + Math.cos(angle)*spawnR,
+    y: CY + Math.sin(angle)*spawnR,
+    hp, maxHp: hp,
+    speed: toughness === 'skeptic' ? 50 : 65,
+    type: toughness,
+    r: toughness === 'skeptic' ? 14 : 11,
+    id: Math.random(),
+    pitchCooldown: Math.random()*2, // per-recruit cooldown
+  });
+}
+
+// ── UPDATE ────────────────────────────────────────────────────────────────────
+function update(dt) {
+  g.frame++;
+  if (g.waveState !== 'active') return;
+
+  // Passive income
+  if (g.passiveIncome > 0) {
+    g.commission += g.passiveIncome * dt;
+  }
+
+  // Player auto-pitch
+  g.pitchCooldown -= dt;
+  if (g.pitchCooldown <= 0 && g.prospects.length > 0) {
+    g.pitchCooldown = 1 / g.pitchRate;
+    firePlayerPitch();
+  }
+
+  // Recruit pitches
+  for (const rec of g.recruits) {
+    rec.pitchCooldown -= dt;
+    if (rec.pitchCooldown <= 0 && g.prospects.length > 0) {
+      rec.pitchCooldown = 1 / (g.recruitPitchRate * g.recruitSpeed);
+      fireRecruitPitch(rec);
+    }
+    // Orbit
+    rec.angle += dt * rec.orbitSpeed;
+    rec.x = CX + Math.cos(rec.angle) * rec.orbitR;
+    rec.y = CY + Math.sin(rec.angle) * rec.orbitR;
+  }
+
+  // Prospects move toward player
+  for (const pr of g.prospects) {
+    const dx = CX - pr.x, dy = CY - pr.y;
+    const dist = Math.sqrt(dx*dx+dy*dy);
+    if (dist < 1) continue;
+    pr.x += (dx/dist) * pr.speed * dt;
+    pr.y += (dy/dist) * pr.speed * dt;
+
+    // Hit player
+    if (dist < 20 + pr.r) {
+      g.hp -= 10;
+      pr.hp = -1; // remove
+      spawnParticles(CX, CY, '#cc4444', 8);
+      addFloater(CX, CY-20, '-10 HP', '#cc4444');
+    }
+  }
+
+  // Move projectiles
+  for (const p of g.projectiles) {
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.age += dt;
+
+    // Hit prospects
+    for (const pr of g.prospects) {
+      const dx = p.x - pr.x, dy = p.y - pr.y;
+      const dist = Math.sqrt(dx*dx+dy*dy);
+      if (dist < pr.r + 5) {
+        pr.hp -= p.dmg;
+        p.hit = true;
+        if (pr.hp <= 0) {
+          convertProspect(pr);
+        }
+        break;
+      }
+    }
+  }
+
+  // Remove dead/old entities
+  g.projectiles = g.projectiles.filter(p => !p.hit && p.age < 1.5);
+  g.prospects = g.prospects.filter(p => p.hp > 0);
+
+  // Update particles
+  for (const p of g.particles) {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.1;
+    p.alpha -= 0.03;
+  }
+  g.particles = g.particles.filter(p=>p.alpha>0);
+
+  // Floaters
+  for (const f of g.floaters) {
+    f.y -= 1; f.alpha -= 0.025;
+  }
+  g.floaters = g.floaters.filter(f=>f.alpha>0);
+
+  // Check wave complete
+  if (g.prospects.length === 0 && g.prospectsLeft === 0) {
+    if (g.wave >= 10) {
+      // Win!
+      endGame(true);
+    } else {
+      g.waveState = 'upgrading';
+      setTimeout(showUpgrades, 500);
+    }
+  }
+
+  // Check death
+  if (g.hp <= 0) {
+    g.hp = 0;
+    endGame(false);
+  }
+
+  updateUI();
+}
+
+function convertProspect(pr) {
+  g.totalConverted++;
+  const commission = pr.type === 'skeptic' ? 200 : 100;
+  g.commission += commission;
+  addFloater(pr.x, pr.y-15, `+$${commission}`, '#3a8a3a');
+  spawnParticles(pr.x, pr.y, '#ddcc44', 12);
+  spawnParticles(pr.x, pr.y, '#44cc88', 6);
+
+  // Add recruit
+  const idx = g.recruits.length;
+  const orbitR = g.recruitOrbitR + Math.floor(idx/6)*35;
+  g.recruits.push({
+    x: pr.x, y: pr.y,
+    angle: Math.atan2(pr.y-CY, pr.x-CX),
+    orbitR,
+    orbitSpeed: 0.6 + Math.random()*0.4,
+    pitchCooldown: Math.random(),
+    color: RECRUIT_COLORS[idx % RECRUIT_COLORS.length],
+    r: 9,
+  });
+  updateOrgChart();
+}
+
+function firePlayerPitch() {
+  const targets = nearestProspects(CX, CY, g.pitchRange, g.multiPitch);
+  for (const target of targets) {
+    const dx = target.x - CX, dy = target.y - CY;
+    const dist = Math.sqrt(dx*dx+dy*dy);
+    g.projectiles.push({
+      x: CX, y: CY,
+      vx: (dx/dist)*g.pitchSpeed,
+      vy: (dy/dist)*g.pitchSpeed,
+      dmg: g.pitchDmg,
+      age: 0, owner:'player'
+    });
+  }
+}
+
+function fireRecruitPitch(rec) {
+  const targets = nearestProspects(rec.x, rec.y, g.pitchRange + 40, 1);
+  for (const target of targets) {
+    const dx = target.x - rec.x, dy = target.y - rec.y;
+    const dist = Math.sqrt(dx*dx+dy*dy);
+    g.projectiles.push({
+      x: rec.x, y: rec.y,
+      vx: (dx/dist)*g.pitchSpeed*0.85,
+      vy: (dy/dist)*g.pitchSpeed*0.85,
+      dmg: Math.round(g.pitchDmg * 0.7),
+      age: 0, owner:'recruit', color: rec.color
+    });
+  }
+}
+
+function nearestProspects(x, y, range, count) {
+  return g.prospects
+    .map(p => ({ p, d: Math.sqrt((p.x-x)**2+(p.y-y)**2) }))
+    .filter(o => o.d < range)
+    .sort((a,b) => a.d-b.d)
+    .slice(0, count)
+    .map(o => o.p);
+}
+
+function spawnParticles(x, y, color, count) {
+  for (let i=0; i<count; i++) {
+    const ang = Math.random()*Math.PI*2;
+    const spd = 1+Math.random()*4;
+    g.particles.push({ x, y, vx:Math.cos(ang)*spd, vy:Math.sin(ang)*spd-2, color, alpha:1, r:2+Math.random()*3 });
+  }
+}
+
+function addFloater(x, y, text, color) {
+  g.floaters.push({ x, y, text, color, alpha:1 });
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function render() {
+  ctx.clearRect(0,0,W,H);
+
+  // Background grid
+  ctx.fillStyle = '#faf8f2';
+  ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle = '#f0ece0';
+  ctx.lineWidth = 1;
+  for (let x=0; x<W; x+=30) {
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+  }
+  for (let y=0; y<H; y+=30) {
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+  }
+
+  // Pitch range indicator (subtle)
+  ctx.strokeStyle = 'rgba(200,160,0,0.08)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([5,5]);
+  ctx.beginPath();
+  ctx.arc(CX, CY, g.pitchRange, 0, Math.PI*2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Recruits
+  for (const rec of g.recruits) {
+    // Orbit trail
+    ctx.strokeStyle = rec.color+'33';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3,4]);
+    ctx.beginPath();
+    ctx.arc(CX, CY, rec.orbitR, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.beginPath();
+    ctx.arc(rec.x, rec.y, rec.r, 0, Math.PI*2);
+    ctx.fillStyle = rec.color;
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.font = '8px sans-serif';
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.fillText('$', rec.x, rec.y+3);
+  }
+
+  // Player (gold pyramid)
+  drawPyramid(CX, CY, 28, '#cc9900');
+
+  // HP flash
+  if (g.hp < g.maxHp * 0.3) {
+    const flash = Math.sin(g.frame * 0.15) * 0.5 + 0.5;
+    ctx.strokeStyle = `rgba(200,50,50,${flash*0.5})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(CX, CY, 32, 0, Math.PI*2);
+    ctx.stroke();
+  }
+
+  // Prospects
+  for (const pr of g.prospects) {
+    const hpPct = pr.hp / pr.maxHp;
+    // Converting color: gray → gold
+    const r = Math.round(120 + 95*(1-hpPct));
+    const gr = Math.round(115 + 60*(1-hpPct));
+    const b = Math.round(110 - 50*(1-hpPct));
+    const faceColor = `rgb(${r},${gr},${b})`;
+
+    ctx.beginPath();
+    ctx.arc(pr.x, pr.y, pr.r, 0, Math.PI*2);
+    ctx.fillStyle = faceColor;
+    ctx.fill();
+    ctx.strokeStyle = pr.type === 'skeptic' ? '#888' : '#bbb';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Face
+    ctx.font = `${pr.r*1.4}px serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(hpPct > 0.5 ? '😐' : '🤩', pr.x, pr.y + pr.r*0.45);
+
+    // HP bar
+    ctx.fillStyle = '#ddd';
+    ctx.fillRect(pr.x-pr.r, pr.y-pr.r-6, pr.r*2, 4);
+    ctx.fillStyle = `rgb(${Math.round(200*(1-hpPct)+50)}, ${Math.round(180*hpPct)}, 50)`;
+    ctx.fillRect(pr.x-pr.r, pr.y-pr.r-6, pr.r*2*hpPct, 4);
+  }
+
+  // Projectiles (pitch decks)
+  for (const p of g.projectiles) {
+    const color = p.owner === 'player' ? '#cc9900' : (p.color || '#cc9900');
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(Math.atan2(p.vy, p.vx));
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(6,0); ctx.lineTo(0,4); ctx.lineTo(-6,0); ctx.lineTo(0,-4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Particles
+  for (const p of g.particles) {
+    ctx.globalAlpha = p.alpha;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+    ctx.fillStyle = p.color;
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Floaters
+  ctx.textAlign = 'center';
+  for (const f of g.floaters) {
+    ctx.globalAlpha = f.alpha;
+    ctx.font = 'bold 13px Arial';
+    ctx.fillStyle = f.color;
+    ctx.fillText(f.text, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
+
+  // Wave clear message
+  if (g.waveState === 'upgrading') {
+    ctx.fillStyle = 'rgba(245,240,232,0.7)';
+    ctx.fillRect(0,0,W,H);
+    ctx.font = 'bold 18px Arial';
+    ctx.fillStyle = '#cc9900';
+    ctx.textAlign = 'center';
+    ctx.fillText('WAVE COMPLETE', CX, CY);
+    ctx.font = '12px Arial';
+    ctx.fillStyle = '#aaa';
+    ctx.fillText('Selecting upgrade...', CX, CY+24);
+  }
+}
+
+function drawPyramid(x, y, size, color) {
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 15;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x, y - size);
+  ctx.lineTo(x + size*0.85, y + size*0.6);
+  ctx.lineTo(x - size*0.85, y + size*0.6);
+  ctx.closePath();
+  ctx.fill();
+  // Highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.2)';
+  ctx.beginPath();
+  ctx.moveTo(x, y - size);
+  ctx.lineTo(x + size*0.2, y);
+  ctx.lineTo(x, y - size*0.3);
+  ctx.closePath();
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
+// ── UPGRADES ──────────────────────────────────────────────────────────────────
+function showUpgrades() {
+  const pool = [...UPGRADES].sort(() => Math.random()-0.5).slice(0,3);
+  const cards = document.getElementById('upgradeCards');
+  cards.innerHTML = '';
+  for (const up of pool) {
+    const el = document.createElement('div');
+    el.className = 'upgrade-card';
+    el.innerHTML = `<div class="u-icon">${up.icon}</div><div class="u-name">${up.name}</div><div class="u-desc">${up.desc}</div>`;
+    el.onclick = () => {
+      up.apply(g);
+      document.getElementById('upgradeOverlay').style.display = 'none';
+      g.wave++;
+      g.waveState = 'active';
+      g.prospectsLeft = 0; // will be set by spawnWave
+      spawnWave(g.wave);
+    };
+    cards.appendChild(el);
+  }
+  document.getElementById('upgradeOverlay').style.display = 'flex';
+}
+
+// ── GAME OVER ──────────────────────────────────────────────────────────────────
+function endGame(won) {
+  g.waveState = 'gameover';
+  const overlay = document.getElementById('gameoverOverlay');
+  document.getElementById('goTitle').textContent = won ? '🏆 Empire Built!' : '📉 Pyramid Collapsed';
+  document.getElementById('goResult').textContent = won
+    ? `You survived all 10 waves with ${g.recruits.length} in your downline.`
+    : `Fell on wave ${g.wave} with ${g.totalConverted} converts.`;
+  document.getElementById('goCommission').textContent = `$${Math.round(g.commission).toLocaleString()} earned`;
+  overlay.style.display = 'flex';
+}
+
+function restartGame() {
+  document.getElementById('gameoverOverlay').style.display = 'none';
+  document.getElementById('upgradeOverlay').style.display = 'none';
+  resetGame();
+}
+
+// ── UI ─────────────────────────────────────────────────────────────────────────
+function updateUI() {
+  document.getElementById('hpVal').textContent = Math.max(0,Math.round(g.hp));
+  document.getElementById('hpFill').style.width = Math.max(0,g.hp/g.maxHp*100)+'%';
+  document.getElementById('commVal').textContent = '$'+Math.round(g.commission).toLocaleString();
+  document.getElementById('downlineVal').textContent = g.recruits.length;
+  document.getElementById('convertedVal').textContent = g.totalConverted;
+  if (g.prospectsLeft > 0) {
+    document.getElementById('waveLabel').textContent = `${g.prospects.length} remaining`;
+  }
+}
+
+function updateOrgChart() {
+  const chart = document.getElementById('orgChart');
+  chart.innerHTML = `<div class="org-node"><div class="org-dot" style="background:#cc9900"></div><span>You (Top)</span><span class="org-commission">+${g.recruits.length*10}%</span></div>`;
+  const shown = g.recruits.slice(-8);
+  for (let i=0; i<shown.length; i++) {
+    const rec = shown[i];
+    const el = document.createElement('div');
+    el.className = 'org-node org-indent';
+    el.innerHTML = `<div class="org-dot" style="background:${rec.color}"></div><span>Recruit #${g.recruits.length-shown.length+i+1}</span><span class="org-commission">$${g.wave*50}/run</span>`;
+    chart.appendChild(el);
+  }
+  if (g.recruits.length > 8) {
+    const more = document.createElement('div');
+    more.style.cssText='font-size:9px;color:#ccc;padding:4px 6px';
+    more.textContent=`+ ${g.recruits.length-8} more...`;
+    chart.appendChild(more);
+  }
+}
+
+// ── LOOP ──────────────────────────────────────────────────────────────────────
+function loop(ts) {
+  const dt = Math.min((ts - g.lastTime)/1000, 0.05);
+  g.lastTime = ts;
+  update(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+
+resetGame();
+requestAnimationFrame(ts => { g.lastTime = ts; requestAnimationFrame(loop); });
+</script>
+</body>
+</html>
