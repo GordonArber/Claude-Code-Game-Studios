@@ -228,6 +228,7 @@ function resetGame() {
     floaters: [],
     trail: [],
     thrallOrbitBase: Math.min(W, H) * 0.1,
+    ringPhase: [],
     frame: 0,
     lastTime: 0,
   };
@@ -307,14 +308,28 @@ function update(dt) {
     firePlayerBolts();
   }
 
-  // Thralls orbit + fire
+  // Advance per-ring rotation phase (alternating direction, slower for outer rings)
+  for (let r = 0; r < g.ringPhase.length; r++) {
+    const dir = (r % 2 === 0 ? 1 : -1);
+    const speed = Math.max(0.18, 0.55 - r * 0.07);
+    g.ringPhase[r] += dir * speed * dt;
+  }
+
+  // Thralls fire + smoothly lerp toward formation slot
+  const radiusRate = 1 - Math.exp(-3.5 * dt);
+  const angleRate  = 1 - Math.exp(-5.0 * dt);
   for (const th of g.thralls) {
     th.fireCooldown -= dt;
     if (th.fireCooldown <= 0 && g.creatures.length > 0) {
       th.fireCooldown = 1 / (g.thrallFireRate * g.thrallAttackSpeed);
       fireThrallBolt(th);
     }
-    th.angle += dt * th.orbitSpeed;
+    th.orbitR += (th.targetOrbitR - th.orbitR) * radiusRate;
+    let diff = th.slotOffsetTarget - th.slotOffsetCurrent;
+    while (diff >  Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    th.slotOffsetCurrent += diff * angleRate;
+    th.angle = g.ringPhase[th.ring] + th.slotOffsetCurrent;
     th.x = g.px + Math.cos(th.angle) * th.orbitR;
     th.y = g.py + Math.sin(th.angle) * th.orbitR;
   }
@@ -411,16 +426,33 @@ function update(dt) {
 }
 
 function recalcThrallOrbits() {
-  // Fixed per-ring radius — no global scale jumps when a new ring forms.
-  // Alternating ring direction keeps the formation visually distinct.
+  // Newest thrall fills innermost ring; older thralls get pushed outward.
+  // When inner ring fills, the next add lands in inner slot 0 and the
+  // previously-inner cohort shifts out to the next ring. Targets only —
+  // actual orbitR/slotOffsetCurrent lerp toward these in the update loop.
   const perRing = 6;
   const ringGap = Math.min(W, H) * 0.075;
-  for (let i = 0; i < g.thralls.length; i++) {
+  const total = g.thralls.length;
+  const numRings = Math.max(1, Math.ceil(total / perRing));
+  while (g.ringPhase.length < numRings) g.ringPhase.push(0);
+
+  for (let i = 0; i < total; i++) {
     const th = g.thralls[i];
-    const ring = Math.floor(i / perRing);
-    th.ring    = ring;
-    th.orbitR  = g.thrallOrbitBase + ring * ringGap;
-    th.orbitSpeed = (ring % 2 === 0 ? 1 : -1) * (0.7 - ring * 0.08);
+    const fromEnd = total - 1 - i;       // 0 = newest
+    const ring = Math.floor(fromEnd / perRing);
+    const slot = fromEnd % perRing;
+    const isOutermost = ring === numRings - 1;
+    const ringSize = isOutermost ? (total - ring * perRing) : perRing;
+
+    // If a thrall changes ring, preserve its visual angle by re-basing
+    // slotOffsetCurrent against the new ring's phase. Avoids snap.
+    if (th.ring !== undefined && th.ring !== ring && th.slotOffsetCurrent !== undefined) {
+      const visualAngle = (g.ringPhase[th.ring] || 0) + th.slotOffsetCurrent;
+      th.slotOffsetCurrent = visualAngle - (g.ringPhase[ring] || 0);
+    }
+    th.ring = ring;
+    th.targetOrbitR = g.thrallOrbitBase + ring * ringGap;
+    th.slotOffsetTarget = (slot / ringSize) * Math.PI * 2;
   }
 }
 
@@ -432,11 +464,12 @@ function dominateCreature(cr) {
   spawnParticles(cr.x, cr.y, '#22d3ee', 5);
 
   const idx = g.thralls.length;
+  const startDist  = Math.hypot(cr.x - g.px, cr.y - g.py);
+  const startAngle = Math.atan2(cr.y - g.py, cr.x - g.px);
   g.thralls.push({
     x: cr.x, y: cr.y,
-    angle: Math.atan2(cr.y - g.py, cr.x - g.px),
-    orbitR: g.thrallOrbitBase,
-    orbitSpeed: 0.45 + Math.random() * 0.55,
+    angle: startAngle,
+    orbitR: startDist,
     fireCooldown: Math.random(),
     color: THRALL_COLORS[idx % THRALL_COLORS.length],
     type: cr.type, r: cr.r * 0.85, emoji: cr.emoji,
@@ -446,6 +479,10 @@ function dominateCreature(cr) {
     maxHp: Math.round(CREATURES[cr.type].baseHp * 3.0 * Math.pow(1.2, g.wave - 1)),
   });
   recalcThrallOrbits();
+  // Seed the new thrall's slotOffsetCurrent so visual angle equals startAngle;
+  // it then lerps from death point into its formation slot.
+  const nth = g.thralls[g.thralls.length - 1];
+  nth.slotOffsetCurrent = startAngle - (g.ringPhase[nth.ring] || 0);
   updateThrallPanel();
 }
 
