@@ -207,14 +207,14 @@ function resetGame() {
     playerSpeed: 220,
     hp: 100, maxHp: 100,
     essence: 0, passiveDrain: 0,
-    boltRate: 1.0,
+    boltRate: 1.6,
     boltDmg: 22,
     boltSpeed: 300,
     boltRange: Math.min(W, H) * 0.4,
     boltPierce: false,
     multibolt: 1,
     boltCooldown: 0,
-    thrallFireRate: 0.32,
+    thrallFireRate: 0.50,
     thrallAttackSpeed: 1,
     acquiredUpgrades: new Set(),
     wave: 1,
@@ -266,7 +266,7 @@ function spawnCreature(wave) {
 
   const def = CREATURES[type];
   const speedBoost = 1 + (wave - 1) * 0.28;
-  const hp  = Math.round(def.baseHp * Math.pow(1.4, wave - 1)); // exponential HP
+  const hp  = Math.round(def.baseHp * Math.pow(1.22, wave - 1)); // exponential HP
   const dmg = def.baseDmg + (wave - 1) * 5;
   const ess = def.essence + wave * 25;
 
