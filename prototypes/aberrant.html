@@ -311,7 +311,7 @@ function update(dt) {
   // Advance per-ring rotation phase (alternating direction, slower for outer rings)
   for (let r = 0; r < g.ringPhase.length; r++) {
     const dir = (r % 2 === 0 ? 1 : -1);
-    const speed = Math.max(0.05, 0.15 - r * 0.03);
+    const speed = Math.max(0.02, 0.06 - r * 0.012);
     g.ringPhase[r] += dir * speed * dt;
   }
 
@@ -348,8 +348,8 @@ function update(dt) {
         if (d < nearestD) { nearestD = d; targetThrall = th; }
       }
       const playerDist = Math.hypot(cr.x - g.px, cr.y - g.py);
-      // Only redirect if thrall is far closer (rare true interception)
-      if (nearestD < playerDist * 0.4) {
+      // Only redirect if thrall is essentially in the way — most charges punch through
+      if (nearestD < playerDist * 0.2) {
         tx = targetThrall.x; ty = targetThrall.y;
       } else {
         targetThrall = null;
@@ -456,8 +456,20 @@ function recalcThrallOrbits() {
   }
 }
 
+const THRALL_CAP = 20;
+
 function dominateCreature(cr) {
   g.totalDominated++;
+
+  // Hard cap on the thrall horde — extra kills yield bonus essence instead.
+  if (g.thralls.length >= THRALL_CAP) {
+    const bonus = cr.essence * 2;
+    g.essence += bonus;
+    addFloater(cr.x, cr.y - 18, `+${bonus} essence`, '#22d3ee');
+    spawnParticles(cr.x, cr.y, '#22d3ee', 12);
+    return;
+  }
+
   g.essence += cr.essence;
   addFloater(cr.x, cr.y - 18, `+${cr.essence}`, '#22d3ee');
   spawnParticles(cr.x, cr.y, '#a855f7', 14);
